@@ -1,3 +1,11 @@
 *.o
 a.exe
 a.out
+build
+!build/Makefile.common
+m4
+build-aux
+Makefile.in
+*.cache
+*.m4
+configure

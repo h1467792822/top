@@ -29,6 +29,10 @@ AM_CONDITIONAL([CHECK_TEST],[test "$notest" = no])
 AC_CONFIG_FILES([Makefile \
 	src/Makefile \
 	src/top/Makefile \
-	src/top/core/Makefile])
+	src/top/core/Makefile \
+	include/Makefile \
+	include/top/Makefile \
+	include/top/core/Makefile \
+	include/top/mem/Makefile])
 
 AC_OUTPUT

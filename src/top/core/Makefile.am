@@ -6,10 +6,11 @@ libtop_core_la_SOURCES = heap.c
 
 if CHECK_TEST
 
-TEST = coretestmain
-check_PROGRAMS = $(TEST)
+TESTS = coretestmain
+check_PROGRAMS = $(TESTS)
 
-coretestmain_SOURCES = test_heap.cpp
+coretestmain_SOURCES = test_main.cpp \
+		       test_heap.cpp
 
 coretestmain_LDFLAGS = @CPPUNIT_LDFLAGS@ $(top_builddir)/src/top/core/libtop_core.la
 

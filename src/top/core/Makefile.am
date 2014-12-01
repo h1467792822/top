@@ -14,7 +14,7 @@ coretestmain_SOURCES = test_main.cpp \
 
 coretestmain_LDFLAGS = @CPPUNIT_LDFLAGS@ $(top_builddir)/src/top/core/libtop_core.la
 
-coretestmain_CFLAGS = @CPPUNIT_CFLAGS@
+coretestmain_CPPFLAGS = @CPPUNIT_CFLAGS@ $(AM_CPPFLAGS)
 
 endif
 

@@ -11,6 +11,8 @@
 extern "C" {
 #endif
 
+#define top_list_entry(ptr,type,member) top_container_of(ptr,type,member)
+
 struct top_list_node {
 	struct top_list_node* next;
 	struct top_list_node* prev;

@@ -127,14 +127,14 @@ static inline void top_avltree_rl_rotation(struct top_avltree* tree,struct top_a
 void top_avltree_link_node(struct top_avltree* tree,struct top_avltree_node* node,struct top_avltree_node* parent,struct top_avltree_node** link) 
 {
 	node->children[0] = node->children[1] = 0;
+	node->bf = 0;
+	*link = node;
 	if(parent){
 		unsigned long idx =  link == &parent->children[0] ? 0 : 1;
 		node->parent = AVLTREE_GEN_PARENT(parent,idx);
 	}else{
 		node->parent = 0;
 	}
-	node->bf = 0;
-	*link = node;
 	while(parent) {
 		if(AVLTREE_RIGHT_CHILD(node)){
 			parent->bf -= 1;
@@ -206,9 +206,11 @@ static inline struct top_avltree_node* top_avltree_node_unlink(struct top_avltre
 	if(node->parent & 1) {
 		parent->children[1] = node_child;
 		parent->bf += 1;
+		if(node_child) node_child->parent = AVLTREE_GEN_PARENT(parent,1);
 	}else {
 		parent->children[0] = node_child;
 		parent->bf -= 1;
+		if(node_child) node_child->parent = AVLTREE_GEN_PARENT(parent,0);
 	}
 	return parent;
 }

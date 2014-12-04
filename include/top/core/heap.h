@@ -25,6 +25,12 @@ static inline void top_heap_init(struct top_heap* heap,top_heap_node_less less) 
 	heap->less = less;
 }
 
+static inline void top_heap_node_init(struct top_heap_node* node)
+{
+	node->s = 0;
+	node->parent = node->left = node->right = 0;
+}
+
 void top_heap_merge(top_heap_node_less less,struct top_heap_node* parent,struct top_heap_node** root, struct top_heap_node* node) ;
 void top_heap_update_s(struct top_heap_node* parent);
 

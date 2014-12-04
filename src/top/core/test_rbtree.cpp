@@ -33,9 +33,14 @@ static void check_tree_node_prev(top_rbtree_node* node,int min) {
 #define BLACK 0
 #define RED 2
 
-static void check_tree_node_color(top_rbtree_node* node,int* black_color,int red_parent,int* black_num)
+static void check_tree_node_color(top_rbtree_node* node,int* black_color,int red_parent,int* black_num,int tabs,const char* msg)
 {
+	tree_node* tnode = (tree_node*)node;
+	if(tabs == 0) cout << endl;
+	for(int i = 0; i < tabs; ++i) cout << "\t";
+	cout << tabs << ":" << msg << ":";
 	if(!node) {
+		cout << "NULL" << endl;
 		if(*black_num == 0) {
 			*black_num = *black_color;
 		}else{
@@ -43,6 +48,8 @@ static void check_tree_node_color(top_rbtree_node* node,int* black_color,int red
 		}
 		return;
 	}
+	cout << tnode->value << ": " << ((node->parent & 2) ? "RED" : "BLACK");
+	cout << endl;
 	int color = node->parent & COLOR_MASK;
 	if(red_parent) {
 		CPPUNIT_ASSERT_EQUAL(color,BLACK);
@@ -50,8 +57,9 @@ static void check_tree_node_color(top_rbtree_node* node,int* black_color,int red
 	if(color == BLACK) {
 		++*black_color;
 	}
-	check_tree_node_color(node->children[0],black_color,color == RED,black_num);
-	check_tree_node_color(node->children[1],black_color,color == RED,black_num);
+	check_tree_node_color(node->children[0],black_color,color == RED,black_num,tabs + 1,"L");
+	cout << endl;
+	check_tree_node_color(node->children[1],black_color,color == RED,black_num,tabs + 1,"R");
 	if(color == BLACK) {
 		--*black_color;
 	}
@@ -60,7 +68,7 @@ static void check_tree_node_color(top_rbtree_node* node,int* black_color,int red
 static void check_tree(top_rbtree* tree) {
 	int black_color = 1;
 	int black_num = 0;
-	check_tree_node_color(tree->root,&black_color,1,&black_num);
+	check_tree_node_color(tree->root,&black_color,1,&black_num,0,"ROOT");
 	check_tree_node_next(top_rbtree_first(tree),INT_MIN);
 	check_tree_node_prev(top_rbtree_last(tree),INT_MAX);
 }
@@ -139,14 +147,13 @@ public:
 		for(int i = 0; i < cnt; ++i) {
 			nodes[i].idx = i;
 			nodes[i].value = values[i];
-			print_tree(&tree);
+			check_tree(&tree);
 			cout << endl << " +++ insert : " << i << ": " << values[i] << endl;
 			tree_insert(&tree,&nodes[i]);	
 			check_tree(&tree);
 			cout << " --- END OF insert : " << i << ": " << values[i] << endl;
-			print_tree(&tree);
 		}
-		print_tree(&tree);
+		check_tree(&tree);
 	}
 	void testDel(int* values,tree_node* unused,int cnt,int start,int step,const char* msg) {
 		struct tree_node* found;
@@ -155,14 +162,14 @@ public:
 			nodes[i] .value = values[i];
 			found = tree_find(&tree,&nodes[i]);
 			if(found) {
-				print_tree(&tree);
+				check_tree(&tree);
 				cout << endl << " +++ DEL: " << values[i] << endl;	
 				top_rbtree_erase(&tree,&found->node);
 				cout << " --- END of DEL: " << values[i] << endl;	
 				check_tree(&tree);
 			}
 		} 
-		print_tree(&tree);
+		check_tree(&tree);
 	}
 	void testInsertOne() {
 		int values[] = { 100 };

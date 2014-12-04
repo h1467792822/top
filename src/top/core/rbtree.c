@@ -198,18 +198,21 @@ void top_rbtree_erase(struct top_rbtree* tree, struct top_rbtree_node* node)
 	int erase_left;
 	int erase_color;
 	if(node->children[0] == 0) {
-		py = top_rbtree_node_parent(node);
 		if(node->children[1]) {
+			erase_color = RB_COLOR(node->children[1]);
+			erase_left = 0;
+			py = node->children[1];
 			top_rbtree_set_parent(tree,node->children[1],node->parent);
-		}else if(!py){
+		}else if(node == tree->root){
 			assert(tree->root == node);
 			tree->root = 0;
 			return;	
 		}else{
+			py = top_rbtree_node_parent(node);
 			py->children[node->parent & RB_POS_MASK] = 0;
+			erase_color = RB_COLOR(node);
+			erase_left = RB_LEFT_CHILD(node);
 		}	
-		erase_color = RB_COLOR(node);
-		erase_left = RB_LEFT_CHILD(node);
 	}else{
 		y = top_rbtree_node_last(node->children[0]);
 		erase_color = RB_COLOR(y);

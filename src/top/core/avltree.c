@@ -4,16 +4,18 @@
 #include <stdio.h>
 #include <assert.h>
 
-#define AVLTREE_RIGHT_CHILD(node) ((node)->parent & 0x01)
-#define AVLTREE_LEFT_CHILD(node) (!((node)->parent & 0x01))
-#define AVLTREE_GEN_PARENT(p,idx) ((unsigned long)(idx) | (unsigned long)p)
+#define AVL_POS_MASK (0x01)
+#define AVL_PARENT_MASK (~AVL_POS_MASK)
+#define AVL_RIGHT_CHILD(node) ((node)->parent & AVL_POS_MASK)
+#define AVL_LEFT_CHILD(node) (!((node)->parent & AVL_POS_MASK))
+#define AVL_GEN_PARENT(p,idx) ((unsigned long)(idx) | (unsigned long)p)
 
 static inline void top_avltree_set_parent(struct top_avltree* tree,struct top_avltree_node* node,unsigned long parent) 
 {
-	struct top_avltree_node* pparent = (struct top_avltree_node*)(parent & ~0x01);
+	struct top_avltree_node* pparent = (struct top_avltree_node*)(parent & AVL_PARENT_MASK);
 	node->parent = parent;
 	if(pparent) 
-		pparent->children[parent & 0x01] = node;
+		pparent->children[parent & AVL_POS_MASK] = node;
 	else
 		tree->root = node;
 }
@@ -27,11 +29,11 @@ static inline void top_avltree_ll_rotation(struct top_avltree* tree,struct top_a
 	top_avltree_set_parent(tree,n,pn->parent);
 
 	n->children[1] = pn;
-	pn->parent = AVLTREE_GEN_PARENT(n,1);
+	pn->parent = AVL_GEN_PARENT(n,1);
 	pn->bf = 0;
 
 	pn->children[0] = rcn;
-	if(rcn) rcn->parent = AVLTREE_GEN_PARENT(pn,0);
+	if(rcn) rcn->parent = AVL_GEN_PARENT(pn,0);
 }
 
 static inline void top_avltree_lr_rotation(struct top_avltree* tree,struct top_avltree_node* pn,struct top_avltree_node* n) 
@@ -44,16 +46,16 @@ static inline void top_avltree_lr_rotation(struct top_avltree* tree,struct top_a
 	top_avltree_set_parent(tree,rcn,pn->parent);
 
 	rcn->children[0] = n;
-	n->parent = AVLTREE_GEN_PARENT(rcn,0);
+	n->parent = AVL_GEN_PARENT(rcn,0);
 
 	n->children[1] = rlcn;
-	if(rlcn) rlcn->parent = AVLTREE_GEN_PARENT(n,1);
+	if(rlcn) rlcn->parent = AVL_GEN_PARENT(n,1);
 
 	rcn->children[1] = pn;
-	pn->parent = AVLTREE_GEN_PARENT(rcn,1);
+	pn->parent = AVL_GEN_PARENT(rcn,1);
 
 	pn->children[0] = rrcn;
-	if(rrcn) rrcn->parent = AVLTREE_GEN_PARENT(pn,0);
+	if(rrcn) rrcn->parent = AVL_GEN_PARENT(pn,0);
 
 	switch(rcn->bf) {
 	case 0:
@@ -81,10 +83,10 @@ static inline void top_avltree_rr_rotation(struct top_avltree* tree,struct top_a
 
 	pn->bf = 0;
 	n->children[0] = pn;
-	pn->parent = AVLTREE_GEN_PARENT(n,0);
+	pn->parent = AVL_GEN_PARENT(n,0);
 
 	pn->children[1] = lcn;
-	if(lcn) lcn->parent = AVLTREE_GEN_PARENT(pn,1);
+	if(lcn) lcn->parent = AVL_GEN_PARENT(pn,1);
 }
 
 static inline void top_avltree_rl_rotation(struct top_avltree* tree,struct top_avltree_node* pn,struct top_avltree_node* n) 
@@ -97,16 +99,16 @@ static inline void top_avltree_rl_rotation(struct top_avltree* tree,struct top_a
 	top_avltree_set_parent(tree,lcn,pn->parent);
 
 	lcn->children[1] = n;
-	n->parent = AVLTREE_GEN_PARENT(lcn,1);
+	n->parent = AVL_GEN_PARENT(lcn,1);
 
 	n->children[0] = lrcn;
-	if(lrcn) lrcn->parent = AVLTREE_GEN_PARENT(n,0);
+	if(lrcn) lrcn->parent = AVL_GEN_PARENT(n,0);
 
 	lcn->children[0] = pn;
-	pn->parent = AVLTREE_GEN_PARENT(lcn,0);
+	pn->parent = AVL_GEN_PARENT(lcn,0);
 
 	pn->children[1] = llcn;
-	if(llcn) llcn->parent = AVLTREE_GEN_PARENT(pn,1);
+	if(llcn) llcn->parent = AVL_GEN_PARENT(pn,1);
 
 	switch(lcn->bf) {
 	case 0:
@@ -131,12 +133,12 @@ void top_avltree_link_node(struct top_avltree* tree,struct top_avltree_node* nod
 	*link = node;
 	if(parent){
 		unsigned long idx =  link == &parent->children[0] ? 0 : 1;
-		node->parent = AVLTREE_GEN_PARENT(parent,idx);
+		node->parent = AVL_GEN_PARENT(parent,idx);
 	}else{
 		node->parent = 0;
 	}
 	while(parent) {
-		if(AVLTREE_RIGHT_CHILD(node)){
+		if(AVL_RIGHT_CHILD(node)){
 			parent->bf -= 1;
 		}else {
 			parent->bf += 1;
@@ -191,26 +193,26 @@ static inline void top_avltree_replace_node(struct top_avltree* tree,struct top_
 	c = pos->children[0];	
 	if(c) {
 		mnode->children[0] = c;
-		c->parent = AVLTREE_GEN_PARENT(mnode,0);
+		c->parent = AVL_GEN_PARENT(mnode,0);
 	}
 	c = pos->children[1];
 	if(c ) {
 		mnode->children[1] = c;
-		c->parent = AVLTREE_GEN_PARENT(mnode,1);
+		c->parent = AVL_GEN_PARENT(mnode,1);
 	}
 }
 
 static inline struct top_avltree_node* top_avltree_node_unlink(struct top_avltree_node* node,struct top_avltree_node* node_child)
 {
-	struct top_avltree_node* parent = (struct top_avltree_node*)(node->parent & ~1);
+	struct top_avltree_node* parent = (struct top_avltree_node*)(node->parent & AVL_PARENT_MASK);
 	if(node->parent & 1) {
 		parent->children[1] = node_child;
 		parent->bf += 1;
-		if(node_child) node_child->parent = AVLTREE_GEN_PARENT(parent,1);
+		if(node_child) node_child->parent = AVL_GEN_PARENT(parent,1);
 	}else {
 		parent->children[0] = node_child;
 		parent->bf -= 1;
-		if(node_child) node_child->parent = AVLTREE_GEN_PARENT(parent,0);
+		if(node_child) node_child->parent = AVL_GEN_PARENT(parent,0);
 	}
 	return parent;
 }
@@ -309,7 +311,7 @@ void top_avltree_erase(struct top_avltree* tree, struct top_avltree_node* node)
 		}
 		p = top_avltree_node_parent(n);
 		if(!p) return;
-		if(AVLTREE_RIGHT_CHILD(n)) {
+		if(AVL_RIGHT_CHILD(n)) {
 			p->bf += 1;
 		}else {
 			p->bf -= 1;
@@ -335,7 +337,7 @@ struct top_avltree_node* top_avltree_node_next(const struct top_avltree_node* no
 		return (struct top_avltree_node*)node;
 	}	 
 
-	while((parent = top_avltree_node_parent(node)) && AVLTREE_RIGHT_CHILD(node)) {
+	while((parent = top_avltree_node_parent(node)) && AVL_RIGHT_CHILD(node)) {
 		 node = parent;
 	}
 	return parent;
@@ -359,7 +361,7 @@ struct top_avltree_node* top_avltree_node_prev(const struct top_avltree_node* no
 		return (struct top_avltree_node*)node;
 	}	 
 
-	while((parent = top_avltree_node_parent(node)) && AVLTREE_LEFT_CHILD(node)) {
+	while((parent = top_avltree_node_parent(node)) && AVL_LEFT_CHILD(node)) {
 		 node = parent;
 	}
 	return parent;

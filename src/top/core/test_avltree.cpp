@@ -4,6 +4,7 @@
 #include <top/core/avltree.h>
 #include <top/core/stddef.h>
 #include <limits.h>
+#include <stdlib.h>
 
 using namespace std;
 
@@ -13,7 +14,7 @@ struct tree_node {
 	int idx;
 };
 
-static void check_tree_node_next(top_avltree_node* node,int max) {
+static void check_tree_node_next(top_avltree_node* node,int max ) {
 	tree_node* tnode = (tree_node*)node;
 	if(tnode){
 	CPPUNIT_ASSERT(tnode->value > max);
@@ -31,9 +32,23 @@ static void check_tree_node_prev(top_avltree_node* node,int min) {
 	}
 }
 
+static void check_tree_node_s(top_avltree_node* node,int* ph)
+{
+	if(!node) return;
+	int lh = 0,rh = 0,s;
+	check_tree_node_s(node->children[0],&lh);
+	check_tree_node_s(node->children[1],&rh);
+	s = lh - rh;
+	CPPUNIT_ASSERT(s >= -1 && s <= 1);
+	if(ph) {
+		if(lh < rh) *ph += rh; else *ph += lh;	
+	}	
+}
+
 static void check_tree(top_avltree* tree) {
-	check_tree_node_next(top_avltree_first(tree),INT_MIN);	
-	check_tree_node_prev(top_avltree_last(tree),INT_MAX);	
+	check_tree_node_s(tree->root,0);
+	check_tree_node_next(top_avltree_first(tree),INT_MIN);
+	check_tree_node_prev(top_avltree_last(tree),INT_MAX);
 }
 
 static void printf_tree(tree_node* root,int tabs,const char* msg) {
@@ -141,9 +156,18 @@ public:
 		struct tree_node nodes[cnt];
 		testValues(values,nodes,cnt,"values");
 	}
+	void gen_values(int * values,int cnt) {
+		static long seed = (long)values;
+		seed += 31;
+		srandom(seed);
+		for(int i = 0; i < cnt; ++i) {
+			values[i] = (int)random();
+		}
+	}
 	void testInsertMore() {
-		int values[] = { 0,1,2,3,4,5,6,10,9,8,7,6,5,2,100,0,-1,99,98,-2,50,66,40 };
+		int values[100];
 		int cnt = sizeof(values)/sizeof(values[0]);
+		gen_values(values,cnt);
 		struct tree_node nodes[cnt];
 		testValues(values,nodes,cnt,"values");
 	}
@@ -162,15 +186,17 @@ public:
 		testDel(values,nodes,cnt,0,1,"del values");
 	}
 	void testInsertMoreDelReverse() {
-		int values[] = { 0,1,2,3,4,5,6,10,9,8,7,6,5,2,100,0,-1,99,98,-2,50,66,40 };
+		int values[99];
 		int cnt = sizeof(values)/sizeof(values[0]);
+		gen_values(values,cnt);
 		struct tree_node nodes[cnt];
 		testValues(values,nodes,cnt,"values");
 		testDel(values,nodes,cnt,cnt - 2,-2,"del values");
 	}
 	void testInsertMoreDel() {
-		int values[] = { 0,1,2,3,4,5,6,10,9,8,7,6,5,2,100,0,-1,99,98,-2,50,66,40 };
+		int values[101];
 		int cnt = sizeof(values)/sizeof(values[0]);
+		gen_values(values,cnt);
 		struct tree_node nodes[cnt];
 		testValues(values,nodes,cnt,"values");
 		testDel(values,nodes,cnt,1,3,"del values");

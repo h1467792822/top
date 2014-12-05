@@ -5,8 +5,11 @@
 #include <top/core/stddef.h>
 #include <limits.h>
 #include <stdlib.h>
+#include "test_timer.hpp"
 
 using namespace std;
+
+static int check_print = 0;
 
 struct tree_node {
 	struct top_avltree_node node;
@@ -36,6 +39,7 @@ static void check_tree_node_s(top_avltree_node* node,int* ph)
 {
 	if(!node) return;
 	int lh = 0,rh = 0,s;
+	CPPUNIT_ASSERT(node->bf >= -1 && node->bf <= 1);
 	check_tree_node_s(node->children[0],&lh);
 	check_tree_node_s(node->children[1],&rh);
 	s = lh - rh;
@@ -64,9 +68,11 @@ static void printf_tree(tree_node* root,int tabs,const char* msg) {
 }
 
 static void print_tree(top_avltree* tree) {
-	struct top_avltree_node* node = top_avltree_first(tree);
-	struct tree_node* tnode;
-	printf_tree(top_container_of(tree->root,tree_node,node),0,"root");	
+	if(check_print) {
+		struct top_avltree_node* node = top_avltree_first(tree);
+		struct tree_node* tnode;
+		printf_tree(top_container_of(tree->root,tree_node,node),0,"root");	
+	}
 }
 
 tree_node* tree_find(struct top_avltree* tree,tree_node* node)
@@ -115,7 +121,9 @@ class TestAvlTree: public CPPUNIT_NS::TestFixture
 	CPPUNIT_TEST( testInsertOneDel );
 	CPPUNIT_TEST( testInsertTwoDel );
 	CPPUNIT_TEST( testInsertMoreDel );
+	CPPUNIT_TEST( testInsertMoreDelRepeat );
 	CPPUNIT_TEST( testInsertMoreDelReverse );
+	CPPUNIT_TEST( testInsertFindRepeat );
 	CPPUNIT_TEST_SUITE_END();
 	struct top_avltree tree;
 public:
@@ -202,6 +210,44 @@ public:
 		testDel(values,nodes,cnt,1,3,"del values");
 		testDel(values,nodes,cnt,0,2,"del values");
 		testDel(values,nodes,cnt,0,1,"del values");
+	}
+	void testInsertMoreDelRepeat() {
+		int times = 1000;
+		int check = check_print;
+		check_print = 0;
+		{
+		top::test::Timer tm;
+		for(int i = 0; i < times; ++i) {
+			setUp();
+			testInsertMoreDel();
+			tearDown();
+		}
+		}
+		check_print = check;
+	}
+	void testFind(int * values,int cnt)  {
+		tree_node nodes[cnt];
+		tree_node* found;
+		for(int i = 0; i < cnt; ++i) {
+			nodes[i].value = values[i];
+			found = tree_find(&tree,&nodes[i]);	
+			CPPUNIT_ASSERT(found);
+			CPPUNIT_ASSERT(found != &nodes[i]);
+		}
+	}
+	void testInsertFindRepeat() {
+		int times = 1000;
+		int values[1000];
+		int cnt = sizeof(values)/sizeof(values[0]);
+		tree_node nodes[cnt];
+		gen_values(values,cnt);
+		testValues(values,nodes,cnt,"values");
+		{
+		top::test::Timer tm;
+		for(int i = 0; i < times; ++i) {
+			testFind(values,cnt);
+		}
+		}
 	}
 };
 

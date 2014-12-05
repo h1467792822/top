@@ -37,7 +37,6 @@ static inline void top_rbtree_set_parent(struct top_rbtree* tree,struct top_rbtr
 
 static inline void top_rbtree_ll_rotation(struct top_rbtree* tree,struct top_rbtree_node* gu,struct top_rbtree_node* pu) 
 {
-	printf("\n%s\n",__func__);
 	struct top_rbtree_node* pur = pu->children[1];
 	unsigned long color = RB_COLOR(pu);
 	top_rbtree_set_parent(tree,pu,gu->parent);
@@ -51,7 +50,6 @@ static inline void top_rbtree_ll_rotation(struct top_rbtree* tree,struct top_rbt
 
 static inline void top_rbtree_lr_rotation(struct top_rbtree* tree,struct top_rbtree_node* gu,struct top_rbtree_node* pu,struct top_rbtree_node* w,struct top_rbtree_node* u) 
 {
-	printf("\n%s\n",__func__);
 	struct top_rbtree_node* ul = u->children[0];
 	struct top_rbtree_node* ur = u->children[1];
 
@@ -73,7 +71,6 @@ static inline void top_rbtree_lr_rotation(struct top_rbtree* tree,struct top_rbt
 
 static inline void top_rbtree_rr_rotation(struct top_rbtree* tree,struct top_rbtree_node* gu,struct top_rbtree_node* pu) 
 {
-	printf("\n%s\n",__func__);
 	struct top_rbtree_node* pul = pu->children[0];
 	unsigned long color = RB_COLOR(pu);
 
@@ -88,7 +85,6 @@ static inline void top_rbtree_rr_rotation(struct top_rbtree* tree,struct top_rbt
 
 static inline void top_rbtree_rl_rotation(struct top_rbtree* tree,struct top_rbtree_node* gu,struct top_rbtree_node* pu,struct top_rbtree_node* w,struct top_rbtree_node* u) 
 {
-	printf("\n%s\n",__func__);
 	struct top_rbtree_node* ul = u->children[0];
 	struct top_rbtree_node* ur = u->children[1];
 	
@@ -123,7 +119,6 @@ void top_rbtree_link_node(struct top_rbtree* tree,struct top_rbtree_node* node,s
 	}
 	while(parent && RB_COLOR(parent) == RB_RED) {
 		gu = top_rbtree_node_parent(parent);
-		printf("\n !!! gu->parent: %lu, pu->parent:%lu\n",gu->parent,parent->parent);
 		assert(RB_COLOR(gu) == RB_BLACK);
 		if(RB_RIGHT_CHILD(parent)) {
 			guc = gu->children[0];
@@ -199,34 +194,39 @@ void top_rbtree_erase(struct top_rbtree* tree, struct top_rbtree_node* node)
 	int erase_color;
 	if(node->children[0] == 0) {
 		if(node->children[1]) {
-			erase_color = RB_COLOR(node->children[1]);
-			erase_left = 0;
 			py = node->children[1];
-			top_rbtree_set_parent(tree,node->children[1],node->parent);
+			erase_color = RB_COLOR(py);
+			erase_left = 0;
+			top_rbtree_set_parent(tree,py,node->parent);
 		}else if(node == tree->root){
 			assert(tree->root == node);
 			tree->root = 0;
 			return;	
 		}else{
-			py = top_rbtree_node_parent(node);
-			py->children[node->parent & RB_POS_MASK] = 0;
 			erase_color = RB_COLOR(node);
 			erase_left = RB_LEFT_CHILD(node);
+			py = top_rbtree_node_parent(node);
+			py->children[node->parent & RB_POS_MASK] = 0;
 		}	
+	}else if(node->children[1] == 0){
+		py = node->children[0];
+		erase_color = RB_COLOR(py);
+		erase_left = 1;
+		top_rbtree_set_parent(tree,py,node->parent);
 	}else{
 		y = top_rbtree_node_last(node->children[0]);
+		py = top_rbtree_node_parent(y);
 		erase_color = RB_COLOR(y);
-		if(top_rbtree_node_parent(y) == node) {
+		if(py == node) {
 			erase_left = 1;
 			py = y;
 			//replace node with y, and node->children[0] == y && y->children[1] == 0
 			top_rbtree_set_parent(tree,y,node->parent);
 			w = node->children[1];
 			y->children[1] = w;
-			if(w) w->parent = RB_NEW_POS_PARENT(w->parent,y,1);
+			w->parent = RB_NEW_PARENT(w->parent,y);
 		}else {
 			erase_left = 0;
-			py = top_rbtree_node_parent(y);
 			//unlink y, y is the last,so y->children[1] == 0 && py->children[1] == y
 			w = y->children[0];
 			py->children[1] = w;
@@ -240,16 +240,17 @@ void top_rbtree_erase(struct top_rbtree* tree, struct top_rbtree_node* node)
 		}
 	}
 	if(erase_color == RB_RED || !py) return;
+	//erased node is black, so py->children[erase_left] != 0
 color:
 	if(erase_left){
 		v = py->children[1];
 		if(RB_COLOR(v) == RB_BLACK) {
 			if(top_rbtree_node_is_red(v->children[0])){
+				RB_SET_BLACK(v->children[0]);
 				top_rbtree_rl_rotation(tree,py,v,v,v->children[0]);
-				RB_SET_BLACK(py);
 			}else if(top_rbtree_node_is_red(v->children[1])){
-				top_rbtree_rr_rotation(tree,py,v);
 				RB_SET_BLACK(v->children[1]);
+				top_rbtree_rr_rotation(tree,py,v);
 			}else{
 				if(top_rbtree_xb0(tree,py,v)) return;
 				erase_left = RB_LEFT_CHILD(py);
@@ -257,29 +258,29 @@ color:
 				goto color;
 			}
 		}else {
+			// v->children[0] != 0 && v->children[1] != 0
 			w = v->children[0];
 			if(top_rbtree_node_is_red(w->children[0]) ){
+				RB_SET_BLACK(w->children[0]);
 				top_rbtree_rl_rotation(tree,py,v,w,w->children[0]);		
-				RB_SET_BLACK(py);
 			}else if(top_rbtree_node_is_red(w->children[1])){
+				RB_SET_BLACK(w->children[1]);
 				top_rbtree_rl_rotation(tree,py,v,v,w);
-				RB_SET_BLACK(py->children[1]);
 			}else{
+				RB_SET_BLACK(v);
+				RB_SET_RED(w);
 				top_rbtree_rr_rotation(tree,py,v);
-				RB_SET_BLACK(py);
-				RB_SET_RED(py->children[1]);
 			}
 		}
 	}else{
 		v = py->children[0];	
 		if(RB_COLOR(v) == RB_BLACK) {
 			if(top_rbtree_node_is_red(v->children[1])){
+				RB_SET_BLACK(v->children[1]);
 				top_rbtree_lr_rotation(tree,py,v,v,v->children[1]);
-				RB_SET_BLACK(py);
-				return;
 			}else if(top_rbtree_node_is_red(v->children[0])){
-				top_rbtree_ll_rotation(tree,py,v);
 				RB_SET_BLACK(v->children[0]);
+				top_rbtree_ll_rotation(tree,py,v);
 			}else{
 				if(top_rbtree_xb0(tree,py,v)) return;
 				erase_left = RB_LEFT_CHILD(py);
@@ -289,15 +290,15 @@ color:
 		}else{
 			w = v->children[1];
 			if(top_rbtree_node_is_red(w->children[1])){
+				RB_SET_BLACK(w->children[1]);
 				top_rbtree_lr_rotation(tree,py,v,w,w->children[1]);		
-				RB_SET_BLACK(py);
 			}else if(top_rbtree_node_is_red(w->children[0])){
+				RB_SET_BLACK(w->children[0]);
 				top_rbtree_lr_rotation(tree,py,v,v,w);
-				RB_SET_BLACK(py->children[0]);
 			}else {
+				RB_SET_BLACK(v);
+				RB_SET_RED(w);
 				top_rbtree_ll_rotation(tree,py,v);
-				RB_SET_BLACK(py);
-				RB_SET_RED(py->children[0]);
 			}
 		}
 	}

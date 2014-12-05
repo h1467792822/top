@@ -165,7 +165,7 @@ public:
 		testValues(values,nodes,cnt,"values");
 	}
 	void gen_values(int * values,int cnt) {
-		static long seed = (long)values;
+		static long seed = 0;
 		seed += 31;
 		srandom(seed);
 		for(int i = 0; i < cnt; ++i) {
@@ -237,7 +237,7 @@ public:
 	}
 	void testInsertFindRepeat() {
 		int times = 1000;
-		int values[1000];
+		int values[10000];
 		int cnt = sizeof(values)/sizeof(values[0]);
 		tree_node nodes[cnt];
 		gen_values(values,cnt);

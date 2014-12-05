@@ -13,7 +13,12 @@ extern "C" {
 #define top_rb_entry(ptr,type,member) top_container_of(ptr,type,member)
 
 struct top_rbtree_node {
+	union {
 	struct top_rbtree_node* children[2];
+	struct {
+		struct top_rbtree_node* left;
+		struct top_rbtree_node* right;
+	};
 	unsigned long parent;
 };
 

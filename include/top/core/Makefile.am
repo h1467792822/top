@@ -4,4 +4,5 @@ libotp_core_include_HEADERS = stddef.h \
 			      error.h \
 			      list.h \
 			      heap.h \
-				avltree.h
+				avltree.h \
+				linux_rbtree.h

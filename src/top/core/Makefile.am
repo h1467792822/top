@@ -5,7 +5,8 @@ lib_LTLIBRARIES = libtop_core.la
 libtop_core_la_SOURCES = \
 	heap.c \
 	avltree.c \
-	rbtree.c
+	rbtree.c \
+	linux_rbtree.c
 
 if CHECK_TEST
 
@@ -13,9 +14,11 @@ TESTS = coretestmain
 check_PROGRAMS = $(TESTS)
 
 coretestmain_SOURCES = test_main.cpp \
+			test_timer.hpp \
 		       test_heap.cpp \
-			test_avltree.cpp \
-			test_rbtree.cpp
+			test_rbtree.cpp \
+			test_linux_rbtree.cpp \
+			test_avltree.cpp
 
 coretestmain_LDFLAGS = @CPPUNIT_LDFLAGS@ $(top_builddir)/src/top/core/libtop_core.la
 

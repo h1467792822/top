@@ -1,6 +1,6 @@
 #include <cppunit/extensions/HelperMacros.h>
 #include <iostream>
-#include <top/core/rbtree.h>
+#include <top/core/linux_rbtree.h>
 #include <top/core/stddef.h>
 #include <limits.h>
 #include <stdlib.h>
@@ -10,32 +10,28 @@ using namespace std;
 
 static int check_print = 0;
 struct tree_node {
-	struct top_rbtree_node node;
+	struct rb_node node;
 	int value;
 	int idx;
 };
 
-static void check_tree_node_next(top_rbtree_node* node,int max ) {
+static void check_tree_node_next(rb_node* node,int max ) {
 	tree_node* tnode = (tree_node*)node;
 	if(tnode){
 	CPPUNIT_ASSERT(tnode->value > max);
-	check_tree_node_next(top_rbtree_node_next(node),tnode->value);
+	check_tree_node_next(rb_next(node),tnode->value);
 	}
 }
 
-static void check_tree_node_prev(top_rbtree_node* node,int min) {
+static void check_tree_node_prev(rb_node* node,int min) {
 	tree_node* tnode = (tree_node*)node;
 	if(tnode){
 	CPPUNIT_ASSERT(tnode->value < min);
-	check_tree_node_prev(top_rbtree_node_prev(node),tnode->value);
+	check_tree_node_prev(rb_prev(node),tnode->value);
 	}
 }
 
-#define COLOR_MASK 2
-#define BLACK 0
-#define RED 2
-
-static void check_tree_node_color(top_rbtree_node* node,int* black_color,int red_parent,int* black_num,int tabs,const char* msg)
+static void check_tree_node_color(rb_node* node,int* black_color,int red_parent,int* black_num,int tabs,const char* msg)
 {
 	tree_node* tnode = (tree_node*)node;
 	if(check_print) {
@@ -53,72 +49,72 @@ static void check_tree_node_color(top_rbtree_node* node,int* black_color,int red
 		return;
 	}
 	if(check_print) {
-		cout << tnode->value << ": " << ((node->parent & 2) ? "RED" : "BLACK");
+		cout << tnode->value << ": " << (rb_is_red(&tnode->node) ? "RED" : "BLACK");
 		cout << endl;
 	}
-	int color = node->parent & COLOR_MASK;
 	if(red_parent) {
-		CPPUNIT_ASSERT_EQUAL(color,BLACK);
+		CPPUNIT_ASSERT(rb_is_black(node));
 	}
-	if(color == BLACK) {
+	if(rb_is_black(node)){
 		++*black_color;
 	}
-	check_tree_node_color(node->children[0],black_color,color == RED,black_num,tabs + 1,"L");
+	check_tree_node_color(node->rb_left,black_color,rb_is_red(node),black_num,tabs + 1,"L");
 	if(check_print) cout << endl;
-	check_tree_node_color(node->children[1],black_color,color == RED,black_num,tabs + 1,"R");
-	if(color == BLACK) {
+	check_tree_node_color(node->rb_right,black_color,rb_is_red(node),black_num,tabs + 1,"R");
+	if(rb_is_black(node)){
 		--*black_color;
 	}
 }
 
-static void check_tree(top_rbtree* tree) {
+static void check_tree(rb_root* tree) {
 	int black_color = 1;
 	int black_num = 0;
-	check_tree_node_color(tree->root,&black_color,1,&black_num,0,"ROOT");
-	check_tree_node_next(top_rbtree_first(tree),INT_MIN);
-	check_tree_node_prev(top_rbtree_last(tree),INT_MAX);
+	check_tree_node_color(tree->rb_node,&black_color,1,&black_num,0,"ROOT");
+	check_tree_node_next(rb_first(tree),INT_MIN);
+	check_tree_node_prev(rb_last(tree),INT_MAX);
 }
 
-tree_node* tree_find(struct top_rbtree* tree,tree_node* node)
+tree_node* tree_find(struct rb_root* tree,tree_node* node)
 {
-	struct top_rbtree_node* parent = tree->root;
+	struct rb_node* parent = tree->rb_node;
 	struct tree_node* tnode;
 	while(parent) {
-		tnode = top_rb_entry(parent,tree_node,node);
+		tnode = rb_entry(parent,tree_node,node);
 		if(tnode->value == node->value){
 			 return tnode;
 		}
 		if(tnode->value > node->value)
-			parent = parent->children[0];	
+			parent = parent->rb_left;
 		else
-			parent = parent->children[1];	
+			parent = parent->rb_right;
 	}
 	return 0;
 }
 
-tree_node* tree_insert(struct top_rbtree* tree,tree_node* node)
+tree_node* tree_insert(struct rb_root* tree,tree_node* node)
 {
-	struct top_rbtree_node** p = &tree->root;
-	struct top_rbtree_node* parent = *p;
+	struct rb_node** p = &tree->rb_node;
+	struct rb_node* parent = *p;
 	struct tree_node* tnode;
 	while(*p) {
 		parent = *p;
 		tnode = top_container_of(parent,tree_node,node);
 		if(tnode->value > node->value) {
-			p = &parent->children[0];
+			p = &parent->rb_left;
 		}else if(tnode->value < node->value){
-			p = &parent->children[1];
+			p = &parent->rb_right;
 		}else{
 			return tnode;
 		}
 	}
-	top_rbtree_link_node(tree,&node->node,parent,p);
+	rb_link_node(&node->node,parent,p);
+	rb_insert_color(&node->node,tree);
 	return node;
 }
 
-class TestRbTree: public CPPUNIT_NS::TestFixture
+class TestLinuxRbTree: public CPPUNIT_NS::TestFixture
 {
-	CPPUNIT_TEST_SUITE(TestRbTree);
+	CPPUNIT_TEST_SUITE(TestLinuxRbTree);
 	CPPUNIT_TEST( testInsertOne );
 	CPPUNIT_TEST( testInsertTwo );
 	CPPUNIT_TEST( testInsertMore );
@@ -129,9 +125,9 @@ class TestRbTree: public CPPUNIT_NS::TestFixture
 	CPPUNIT_TEST( testInsertMoreDelReverse );
 	CPPUNIT_TEST( testInsertFindRepeat );
 	CPPUNIT_TEST_SUITE_END();
-	struct top_rbtree tree;
+	struct rb_root tree;
 public:
-	void setUp() { tree.root = 0; }
+	void setUp() { tree.rb_node = 0; }
 	void tearDown(){}
 	void testValues(int* values,tree_node* nodes,int cnt,const char* msg) {
 		for(int i = 0; i < cnt; ++i) {
@@ -160,7 +156,7 @@ public:
 				if(check_print) {
 					cout << endl << " +++ DEL: " << values[i] << endl;	
 				}
-				top_rbtree_erase(&tree,&found->node);
+				rb_erase(&found->node,&tree);
 				if(check_print) {
 					cout << " --- END of DEL: " << values[i] << endl;	
 				}
@@ -268,4 +264,4 @@ public:
         }
 };
 
-CPPUNIT_TEST_SUITE_REGISTRATION( TestRbTree );
+CPPUNIT_TEST_SUITE_REGISTRATION( TestLinuxRbTree );

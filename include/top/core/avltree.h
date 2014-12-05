@@ -13,7 +13,13 @@ extern "C" {
 #define top_avl_entry(ptr,type,member) top_container_of(ptr,type,member)
 
 struct top_avltree_node {
+	union {
 	struct top_avltree_node* children[2];
+	struct {
+		struct top_avltree_node* left;
+		struct top_avltree_node* right;
+	};
+	};
 	unsigned long parent;
 	int bf;
 };

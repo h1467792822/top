@@ -63,9 +63,9 @@ static void check_tree_node_color(top_rbtree_node* node,int* black_color,int red
 	if(color == BLACK) {
 		++*black_color;
 	}
-	check_tree_node_color(node->children[0],black_color,color == RED,black_num,tabs + 1,"L");
+	check_tree_node_color(node->left,black_color,color == RED,black_num,tabs + 1,"L");
 	if(check_print) cout << endl;
-	check_tree_node_color(node->children[1],black_color,color == RED,black_num,tabs + 1,"R");
+	check_tree_node_color(node->right,black_color,color == RED,black_num,tabs + 1,"R");
 	if(color == BLACK) {
 		--*black_color;
 	}
@@ -89,9 +89,9 @@ tree_node* tree_find(struct top_rbtree* tree,tree_node* node)
 			 return tnode;
 		}
 		if(tnode->value > node->value)
-			parent = parent->children[0];	
+			parent = parent->left;	
 		else
-			parent = parent->children[1];	
+			parent = parent->right;	
 	}
 	return 0;
 }
@@ -105,9 +105,9 @@ tree_node* tree_insert(struct top_rbtree* tree,tree_node* node)
 		parent = *p;
 		tnode = top_container_of(parent,tree_node,node);
 		if(tnode->value > node->value) {
-			p = &parent->children[0];
+			p = &parent->left;
 		}else if(tnode->value < node->value){
-			p = &parent->children[1];
+			p = &parent->right;
 		}else{
 			return tnode;
 		}

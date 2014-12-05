@@ -19,6 +19,7 @@ struct top_rbtree_node {
 		struct top_rbtree_node* left;
 		struct top_rbtree_node* right;
 	};
+	};
 	unsigned long parent;
 };
 

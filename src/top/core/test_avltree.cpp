@@ -40,8 +40,8 @@ static void check_tree_node_s(top_avltree_node* node,int* ph)
 	if(!node) return;
 	int lh = 0,rh = 0,s;
 	CPPUNIT_ASSERT(node->bf >= -1 && node->bf <= 1);
-	check_tree_node_s(node->children[0],&lh);
-	check_tree_node_s(node->children[1],&rh);
+	check_tree_node_s(node->left,&lh);
+	check_tree_node_s(node->right,&rh);
 	s = lh - rh;
 	CPPUNIT_ASSERT(s >= -1 && s <= 1);
 	if(ph) {
@@ -62,7 +62,7 @@ static void printf_tree(tree_node* root,int tabs,const char* msg) {
 	if(!root) { cout << " NULL" ;return;}
 	cout << root->value;
 	cout << endl;
-	printf_tree((tree_node*)root->node.children[0], tabs + 1,"left");	
+	printf_tree((tree_node*)root->node.left, tabs + 1,"left");	
 	cout << endl;
 	printf_tree((tree_node*)root->node.children[1], tabs + 1,"right");	
 }
@@ -85,9 +85,9 @@ tree_node* tree_find(struct top_avltree* tree,tree_node* node)
 			 return tnode;
 		}
 		if(tnode->value > node->value)
-			parent = parent->children[0];	
+			parent = parent->left;	
 		else
-			parent = parent->children[1];	
+			parent = parent->right;	
 	}
 	return 0;
 }
@@ -101,9 +101,9 @@ tree_node* tree_insert(struct top_avltree* tree,tree_node* node)
 		parent = *p;
 		tnode = top_container_of(parent,tree_node,node);
 		if(tnode->value > node->value) {
-			p = &parent->children[0];
+			p = &parent->left;
 		}else if(tnode->value < node->value){
-			p = &parent->children[1];
+			p = &parent->right;
 		}else{
 			return tnode;
 		}

@@ -16,13 +16,13 @@ check_PROGRAMS = $(TESTS)
 coretestmain_SOURCES = test_main.cpp \
 			test_timer.hpp \
 		       test_heap.cpp \
-			test_rbtree.cpp \
 			test_linux_rbtree.cpp \
+			test_rbtree.cpp \
 			test_avltree.cpp
 
 coretestmain_LDFLAGS = @CPPUNIT_LDFLAGS@ $(top_builddir)/src/top/core/libtop_core.la
 
-coretestmain_CPPFLAGS = @CPPUNIT_CFLAGS@ $(AM_CPPFLAGS)
+coretestmain_CPPFLAGS = $(AM_CPPFLAGS) @CPPUNIT_CFLAGS@
 
 endif
 

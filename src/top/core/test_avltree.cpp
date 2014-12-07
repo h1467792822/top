@@ -212,7 +212,7 @@ public:
 		testDel(values,nodes,cnt,0,1,"del values");
 	}
 	void testInsertMoreDelRepeat() {
-		int times = 1000;
+		int times = 100;
 		int check = check_print;
 		check_print = 0;
 		{
@@ -236,8 +236,8 @@ public:
 		}
 	}
 	void testInsertFindRepeat() {
-		int times = 1000;
-		int values[10000];
+		int times = 100;
+		int values[1000];
 		int cnt = sizeof(values)/sizeof(values[0]);
 		tree_node nodes[cnt];
 		gen_values(values,cnt);

@@ -243,7 +243,7 @@ void top_rbtree_erase(struct top_rbtree* tree, struct top_rbtree_node* node)
 		erase_left = 1;
 		top_rbtree_set_parent(tree,py,node->parent);
 	}else{
-		//choose replaced node from sub tree with red node to optimize lookup performance
+		//choose replaced node from sub tree with red node 
 		if(RB_IS_RED(node->right)){
 			y = top_rbtree_node_first(node->right);
 			py = top_rbtree_node_parent(y);

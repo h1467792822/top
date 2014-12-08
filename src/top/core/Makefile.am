@@ -19,7 +19,12 @@ coretestmain_SOURCES = test_main.cpp \
 			test_rbtree.cpp \
 			test_linux_rbtree.cpp \
 			test_avltree.cpp \
-			test_list.cpp
+			test_list.cpp \
+			test_hlist.cpp
+
+coretestmain_SOURCES1 = test_main.cpp \
+			test_list.cpp \
+			test_hlist.cpp
 
 coretestmain_LDFLAGS = @CPPUNIT_LDFLAGS@ $(top_builddir)/src/top/core/libtop_core.la
 

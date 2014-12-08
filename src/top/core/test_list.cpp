@@ -21,6 +21,7 @@ class TestList: public CPPUNIT_NS::TestFixture
 	CPPUNIT_TEST( testRangeRemove );
 	CPPUNIT_TEST( testListMove );
 	CPPUNIT_TEST( testNodeMove );
+	CPPUNIT_TEST( testNodeRangeMove );
 	CPPUNIT_TEST_SUITE_END();
 public:
 	void setUp() { 
@@ -73,20 +74,11 @@ public:
 	void testAddTwo() {
 		top_list list = TOP_LIST_INIT(list);
 		list_node nodes[2];
-#if 1
 		for(int i = 0; i < 2; ++i)
 			top_list_add(&list,&nodes[i].node);
 		check_size(&list,2);
 		CPPUNIT_ASSERT_EQUAL(list.first,&nodes[1].node);
 		CPPUNIT_ASSERT_EQUAL(list.last,&nodes[0].node);
-#else
-		top_list_init(&list);
-		for(int i = 0; i < 2; ++i)
-			top_list_add_tail(&list,&nodes[i].node);
-		check_size(&list,2);
-		CPPUNIT_ASSERT_EQUAL(list.first,&nodes[0].node);
-		CPPUNIT_ASSERT_EQUAL(list.last,&nodes[1].node);
-#endif
 	}
 	void testAddMore() {
 		int cnt = 100;
@@ -136,14 +128,14 @@ public:
 			top_list_add_tail(&list,&nodes[i].node);
 		CPPUNIT_ASSERT_EQUAL(list.first,&nodes[0].node);
 		check_size(&list,cnt);
-		top_list_node_remove(&nodes[0].node);
+		top_list_node_del(&nodes[0].node);
 		CPPUNIT_ASSERT_EQUAL(list.first,&nodes[1].node);
 		check_size(&list,cnt - 1);
-		top_list_node_remove(&nodes[cnt - 1].node);
+		top_list_node_del(&nodes[cnt - 1].node);
 		CPPUNIT_ASSERT_EQUAL(list.last,&nodes[cnt - 2].node);
 		check_size(&list,cnt - 2);
 		for(int i = 1; i < cnt - 1; ++i){
-			top_list_node_remove(&nodes[i].node);
+			top_list_node_del(&nodes[i].node);
 		}
 		check_size(&list,0);
 	}
@@ -157,11 +149,11 @@ public:
 			top_list_add_tail(&list,&nodes[i].node);
 		CPPUNIT_ASSERT_EQUAL(list.first,&nodes[0].node);
 		check_size(&list,cnt);
-		top_list_range_remove(&nodes[1].node,&nodes[cnt - 2].node);
+		top_list_range_del(&nodes[1].node,&nodes[cnt - 2].node);
 		check_size(&list,2);
 		CPPUNIT_ASSERT_EQUAL(list.first,&nodes[0].node);
 		CPPUNIT_ASSERT_EQUAL(list.last,&nodes[cnt - 1].node);
-		top_list_range_remove(&nodes[0].node,&nodes[cnt - 1].node);
+		top_list_range_del(&nodes[0].node,&nodes[cnt - 1].node);
 		check_size(&list,0);
 
 	}
@@ -208,6 +200,44 @@ public:
 		CPPUNIT_ASSERT_EQUAL(list.first,&nodes[3].node);
 		check_size(&list2,3);
 		check_size(&list,cnt - 3);
+
+		top_list_node_move_tail(list.first,&list);
+		CPPUNIT_ASSERT_EQUAL(list.first,&nodes[4].node);
+		CPPUNIT_ASSERT_EQUAL(list.last,&nodes[3].node);
+		check_size(&list,cnt - 3);
+		check_size(&list2,3);
+	}
+	void testNodeRangeMove()
+	{
+		int cnt = 100;
+		list_node nodes[cnt];
+		top_list list = TOP_LIST_INIT(list);
+		for(int i = 0; i < cnt; ++i)
+			top_list_add_tail(&list,&nodes[i].node);
+		CPPUNIT_ASSERT_EQUAL(list.first,&nodes[0].node);
+		check_size(&list,cnt);
+		CPPUNIT_ASSERT_EQUAL(list.first,&nodes[0].node);
+
+		TOP_LIST(list2);
+		
+		top_list_range_move(&nodes[0].node,&nodes[2].node,&list2);
+		check_size(&list,cnt - 3);
+		check_size(&list2,3);
+		CPPUNIT_ASSERT_EQUAL(list.first,&nodes[3].node);
+		CPPUNIT_ASSERT_EQUAL(list2.first,&nodes[0].node);
+		CPPUNIT_ASSERT_EQUAL(list2.last,&nodes[2].node);
+
+		top_list_range_move(&nodes[3].node,&nodes[5].node,&list2);
+		CPPUNIT_ASSERT_EQUAL(list2.last,&nodes[2].node);
+		CPPUNIT_ASSERT_EQUAL(list2.first,&nodes[3].node);
+		check_size(&list,cnt - 6);
+		check_size(&list2,6);
+
+		top_list_range_move_tail(&nodes[3].node,&nodes[5].node,&list2);
+		CPPUNIT_ASSERT_EQUAL(list2.last,&nodes[5].node);
+		CPPUNIT_ASSERT_EQUAL(list2.first,&nodes[0].node);
+		check_size(&list,cnt - 6);
+		check_size(&list2,6);
 	}
 };
 

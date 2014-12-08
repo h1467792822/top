@@ -36,7 +36,7 @@ static inline void __top_list_node_link(struct top_list_node* prev,struct top_li
 	next->prev = prev;
 }
 
-static inline void top_list_node_insert(struct top_list_node* pos,struct top_list_node* newnode) {
+static inline void top_list_node_insert(struct top_list_node* newnode,struct top_list_node* pos) {
 	__top_list_node_link(pos->prev,newnode);
 	__top_list_node_link(newnode,pos);
 }
@@ -51,23 +51,23 @@ static inline void top_list_add_tail(struct top_list* list,struct top_list_node*
 	__top_list_node_link(node,(struct top_list_node*)list);
 }
 
-static inline void top_list_node_remove(struct top_list_node* node) {
+static inline void top_list_node_del(struct top_list_node* node) {
 	__top_list_node_link(node->prev,node->next);
 }
 
 // 
-static inline void top_list_range_remove(struct top_list_node* first, struct top_list_node* last) {
+static inline void top_list_range_del(struct top_list_node* first, struct top_list_node* last) {
 	__top_list_node_link(first->prev,last->next);
 }
 
 static inline void top_list_node_move_at(struct top_list_node* node,struct top_list_node* pos) {
-	top_list_node_remove(node);
-	top_list_node_insert(pos,node);
+	top_list_node_del(node);
+	top_list_node_insert(node,pos);
 }
 
 static inline void top_list_range_move_at(struct top_list_node* first,struct top_list_node* last,struct top_list_node* pos) {
 	struct top_list_node* prev = pos->prev;
-	top_list_range_remove(first,last);
+	top_list_range_del(first,last);
 	__top_list_node_link(pos->prev,first);
 	__top_list_node_link(last,pos);
 }

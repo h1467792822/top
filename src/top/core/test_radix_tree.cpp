@@ -9,16 +9,34 @@ using namespace std;
 class TestRadixTree: public CPPUNIT_NS::TestFixture
 {
 	CPPUNIT_TEST_SUITE(TestRadixTree);
+	CPPUNIT_TEST( testOne  );
 	CPPUNIT_TEST( testInsertFind  );
 	CPPUNIT_TEST( testDelete );
 	CPPUNIT_TEST( testMoreData );
 	CPPUNIT_TEST_SUITE_END();
 	struct top_radix_tree tree;
 public:
-	void setUp() { top_radix_tree_init(&tree,0); std::cout << "setUp()" << std::endl; }
+	void setUp() { top_radix_tree_init(&tree,0); std::cout << endl << __func__ << std::endl; }
 	void tearDown(){ top_radix_tree_fini(&tree); }
+	void gen_values(unsigned long* values,int cnt) {
+		srandom((unsigned long)values);
+		for(int i = 0; i < cnt; ++i)
+			values[i] = random();
+	}
+	void testOne() {
+		top_error_t err;
+		err = top_radix_tree_insert(&tree,10240,(void*)10240);
+		CPPUNIT_ASSERT_EQUAL(top_errno(err),0);
+		void* found = top_radix_tree_find(&tree,10240);
+		void* del = top_radix_tree_delete(&tree,10240);
+		CPPUNIT_ASSERT_EQUAL(found,del);
+		CPPUNIT_ASSERT_EQUAL((unsigned long)found,10240ul);
+		CPPUNIT_ASSERT_EQUAL((void*)tree.root,(void*)0);
+		CPPUNIT_ASSERT_EQUAL(tree.height,0);
+	}
 	void testInsertFind() {
-		unsigned long values[] = { 0,11,22,33,400,5000,60,70,801,900,10000 };
+		unsigned long values[10];
+		gen_values(values,10);
 		top_error_t err;
 		for(int i = 0; i < sizeof(values)/sizeof(values[0]); ++i) {
 			err = top_radix_tree_insert(&tree,values[i],(void*)values[i]);
@@ -30,7 +48,8 @@ public:
 		}
 	}
 	void testDelete()  {
-		unsigned long values[] = { 0,11,22,33,400,5000,60,70,801,900,10000 };
+		unsigned long values[10];
+		gen_values(values,10);
 		top_error_t err;
 		for(int i = 0; i < sizeof(values)/sizeof(values[0]); ++i) {
 			err = top_radix_tree_insert(&tree,values[i],(void*)values[i]);
@@ -42,6 +61,7 @@ public:
 			found = top_radix_tree_find(&tree,values[i]);
 			CPPUNIT_ASSERT_EQUAL((unsigned long)found,(unsigned long)0);
 		}
+		CPPUNIT_ASSERT_EQUAL(tree.height,0);
 		CPPUNIT_ASSERT_EQUAL((void*)tree.root,(void*)0);
 	}
 	void testMoreData() {
@@ -64,6 +84,7 @@ public:
 			found = top_radix_tree_find(&tree,(unsigned long)data[i]);
 			CPPUNIT_ASSERT_EQUAL((unsigned long)found,(unsigned long)0);
 		}
+		CPPUNIT_ASSERT_EQUAL(tree.height,0);
 		CPPUNIT_ASSERT_EQUAL((void*)tree.root,(void*)0);
 	}
 };

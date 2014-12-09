@@ -51,12 +51,8 @@ static const struct top_radix_tree_conf g_def_conf = {
 };
 
 
-static int alloc_count = 0;
-static int free_count = 0;
-
 static top_error_t top_radix_tree_alloc_node(struct top_radix_tree* tree,struct top_radix_tree_node** pnode)
 {
-	++alloc_count;
 	struct top_radix_tree_node* node;
 	node = tree->cached;
 	if(tree->cached) {
@@ -92,12 +88,10 @@ static inline void top_radix_tree_free_node(struct top_radix_tree* tree,struct t
 {
 	node->next = tree->cached;
 	tree->cached = node;
-	++free_count;
 }
 
 void top_radix_tree_init(struct top_radix_tree* tree, const struct top_radix_tree_conf* conf)
 {
-	alloc_count = free_count = 0;
 	memset(tree,0,sizeof(*tree));
 	if(conf) {
 		tree->conf = *conf;
@@ -117,7 +111,6 @@ void top_radix_tree_fini(struct top_radix_tree* tree)
 	for(; pos && (next = pos->next, 1); pos = next) {
 		tree->conf.pffree(tree->conf.user_data,pos,RADIX_TREE_PAGE_SIZE);
 	}
-	printf("\n alloc_count: %d, free_count: %d\n",alloc_count,free_count);
 	//memset(tree,0,sizeof(*tree));
 }
 
@@ -177,7 +170,10 @@ fail:
 			slots = root;
 		}while(slots);
 	}
+	goto out;
 }
+
+static inline void top_radix_tree_shrink_from_top(struct top_radix_tree* tree);
 
 top_error_t top_radix_tree_insert(struct top_radix_tree* tree,unsigned long key,void* data)
 {
@@ -193,12 +189,16 @@ top_error_t top_radix_tree_insert(struct top_radix_tree* tree,unsigned long key,
 		++height;
 	}
 	if(height > tree->height) {
-		err = top_radix_tree_extend(tree,height);
-		if(top_errno(err)) return err;
+		if(tree->root) {
+			err = top_radix_tree_extend(tree,height);
+			if(top_errno(err)) return err;
+		}else{
+			tree->height = height;
+		}
 	}
 
 	struct top_radix_tree_node** rollback[height];
-	memset(rollback,0,sizeof(*rollback));
+	memset(rollback,0,sizeof(*rollback) * height);
 	pslots = (struct top_radix_tree_node**)&tree->root;
 	unsigned long shift = (height - 1) * RADIX_TREE_MAP_SHIFT;
 	do{
@@ -219,10 +219,11 @@ top_error_t top_radix_tree_insert(struct top_radix_tree* tree,unsigned long key,
 	*pslots = data;
 	return TOP_OK;
 rollback:
-	for(++height; height; height < tree->height) {
+	for(++height; height < tree->height && rollback[height]; ++height) {
 		top_radix_tree_free_node(tree,*rollback[height]);
 		*rollback[height] = 0;
 	}
+	top_radix_tree_shrink_from_top(tree);
 	return err;
 }
 
@@ -232,7 +233,7 @@ void* top_radix_tree_find(struct top_radix_tree* tree,unsigned long key)
 	return pdata ? *pdata : 0;
 }
 
-static inline void top_radix_tree_shink(struct top_radix_tree* tree, struct top_radix_tree_node*** nodes)
+static inline void top_radix_tree_shrink(struct top_radix_tree* tree, struct top_radix_tree_node*** nodes)
 {
 	struct top_radix_tree_node* slots;	
 	int i,j;
@@ -244,9 +245,19 @@ static inline void top_radix_tree_shink(struct top_radix_tree* tree, struct top_
 		*nodes[i] = 0;
 		top_radix_tree_free_node(tree,slots);
 	}
+	top_radix_tree_shrink_from_top(tree);
+}
 
+static inline void top_radix_tree_shrink_from_top(struct top_radix_tree* tree)
+{
+	struct top_radix_tree_node* slots;	
+	int j;
+	if(0 == tree->root) {
+		tree->height = 0;
+		return;
+	}
 	slots = tree->root;
-	while(slots) {
+	do {
 		for(j = 1; j < RADIX_TREE_MAP_SIZE; ++j) {
 			if(slots->slots[j]) return;
 		}
@@ -257,7 +268,7 @@ static inline void top_radix_tree_shink(struct top_radix_tree* tree, struct top_
 		}else {
 			return;
 		}
-	}
+	}while(slots);
 }
 
 void* top_radix_tree_delete(struct top_radix_tree* tree,unsigned long key)
@@ -281,7 +292,7 @@ void* top_radix_tree_delete(struct top_radix_tree* tree,unsigned long key)
 	}while(height);	
 	data = *pslots;
 	*pslots = 0;
-	top_radix_tree_shink(tree,nodes);
+	top_radix_tree_shrink(tree,nodes);
 	return data;
 }
 

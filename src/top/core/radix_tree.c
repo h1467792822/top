@@ -2,6 +2,7 @@
 #include <top/core/radix_tree.h>
 #include <stdlib.h> //for malloc/free
 #include <string.h> //for memset
+#include <stdio.h>
 
 #ifdef TOP_TEST
 #define RADIX_TREE_MAP_SHIFT 1
@@ -49,8 +50,13 @@ static const struct top_radix_tree_conf g_def_conf = {
 	.max_capacity = (unsigned long)-1,
 };
 
+
+static int alloc_count = 0;
+static int free_count = 0;
+
 static top_error_t top_radix_tree_alloc_node(struct top_radix_tree* tree,struct top_radix_tree_node** pnode)
 {
+	++alloc_count;
 	struct top_radix_tree_node* node;
 	node = tree->cached;
 	if(tree->cached) {
@@ -66,7 +72,7 @@ static top_error_t top_radix_tree_alloc_node(struct top_radix_tree* tree,struct 
 		*pnode = node;
 		return TOP_OK;
 	}
-	if(tree->capacity < tree->conf.max_capacity) {
+	if(tree->conf.max_capacity - RADIX_TREE_PAGE_SIZE > tree->capacity) {
 		top_error_t err = tree->conf.pfmalloc(tree->conf.user_data,RADIX_TREE_PAGE_SIZE,(void**)&node);
 		if(top_errno(err))
 			return err;
@@ -86,10 +92,12 @@ static inline void top_radix_tree_free_node(struct top_radix_tree* tree,struct t
 {
 	node->next = tree->cached;
 	tree->cached = node;
+	++free_count;
 }
 
 void top_radix_tree_init(struct top_radix_tree* tree, const struct top_radix_tree_conf* conf)
 {
+	alloc_count = free_count = 0;
 	memset(tree,0,sizeof(*tree));
 	if(conf) {
 		tree->conf = *conf;
@@ -109,6 +117,7 @@ void top_radix_tree_fini(struct top_radix_tree* tree)
 	for(; pos && (next = pos->next, 1); pos = next) {
 		tree->conf.pffree(tree->conf.user_data,pos,RADIX_TREE_PAGE_SIZE);
 	}
+	printf("\n alloc_count: %d, free_count: %d\n",alloc_count,free_count);
 	//memset(tree,0,sizeof(*tree));
 }
 
@@ -119,12 +128,14 @@ static inline void** top_radix_tree_find_slot(struct top_radix_tree* tree,unsign
 	struct top_radix_tree_node** pslots = &tree->root; 
 	struct top_radix_tree_node* slots;
 	int idx = 0;
+	unsigned long shift = (height - 1) * RADIX_TREE_MAP_SHIFT;
 	do {
 		--height;
 		slots = *pslots;
 		if(slots == 0) return 0;
-		idx =  (key >> (height * RADIX_TREE_MAP_SHIFT) ) & RADIX_TREE_MAP_MASK;
+		idx =  (key >> shift ) & RADIX_TREE_MAP_MASK;
 		pslots = (struct top_radix_tree_node**)&slots->slots[idx];
+		shift -= RADIX_TREE_MAP_SHIFT;
 	}while(height);	
 	return (void**)pslots;
 }
@@ -189,6 +200,7 @@ top_error_t top_radix_tree_insert(struct top_radix_tree* tree,unsigned long key,
 	struct top_radix_tree_node** rollback[height];
 	memset(rollback,0,sizeof(*rollback));
 	pslots = (struct top_radix_tree_node**)&tree->root;
+	unsigned long shift = (height - 1) * RADIX_TREE_MAP_SHIFT;
 	do{
 		--height;
 		slots = *pslots;
@@ -200,8 +212,9 @@ top_error_t top_radix_tree_insert(struct top_radix_tree* tree,unsigned long key,
 			*pslots = slots;
 			rollback[height] = pslots;
 		}
-		idx =  (key >> (height * RADIX_TREE_MAP_SHIFT) ) & RADIX_TREE_MAP_MASK;
+		idx =  (key >> shift) & RADIX_TREE_MAP_MASK;
 		pslots = (struct top_radix_tree_node**)&slots->slots[idx];
+		shift -= RADIX_TREE_MAP_SHIFT;
 	}while(height);
 	*pslots = data;
 	return TOP_OK;
@@ -231,6 +244,20 @@ static inline void top_radix_tree_shink(struct top_radix_tree* tree, struct top_
 		*nodes[i] = 0;
 		top_radix_tree_free_node(tree,slots);
 	}
+
+	slots = tree->root;
+	while(slots) {
+		for(j = 1; j < RADIX_TREE_MAP_SIZE; ++j) {
+			if(slots->slots[j]) return;
+		}
+		if(tree->height > 1 || slots->slots[0] == 0) {
+			tree->root = slots->slots[0];
+			--tree->height;
+			top_radix_tree_free_node(tree,slots);
+		}else {
+			return;
+		}
+	}
 }
 
 void* top_radix_tree_delete(struct top_radix_tree* tree,unsigned long key)
@@ -242,13 +269,15 @@ void* top_radix_tree_delete(struct top_radix_tree* tree,unsigned long key)
 	struct top_radix_tree_node** pslots = &tree->root;
 	struct top_radix_tree_node* slots;
 	int idx = 0;
+	unsigned long shift = (height - 1) * RADIX_TREE_MAP_SHIFT;
 	do {
 		--height;
 		slots = *pslots;
 		if(slots == 0) return 0;
 		nodes[height] = pslots;
-		idx =  (key >> (height * RADIX_TREE_MAP_SHIFT) ) & RADIX_TREE_MAP_MASK;
+		idx =  (key >> shift ) & RADIX_TREE_MAP_MASK;
 		pslots = (struct top_radix_tree_node**)&slots->slots[idx];
+		shift -= RADIX_TREE_MAP_SHIFT;
 	}while(height);	
 	data = *pslots;
 	*pslots = 0;

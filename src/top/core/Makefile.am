@@ -3,11 +3,12 @@ include $(top_srcdir)/build/Makefile.common
 
 lib_LTLIBRARIES = libtop_core.la
 libtop_core_la_SOURCES = \
+	base64.c \
 	heap.c \
 	avltree.c \
 	rbtree.c \
 	linux_rbtree.c \
-	radix_tree.c
+	radix_tree.c 
 
 if CHECK_TEST
 
@@ -22,7 +23,8 @@ coretestmain_SOURCES = test_main.cpp \
 			test_avltree.cpp \
 			test_list.cpp \
 			test_hlist.cpp \
-			test_radix_tree.cpp 
+			test_radix_tree.cpp  \
+			test_base64.cpp
 
 coretestmain_SOURCES1 = test_main.cpp \
 			test_radix_tree.cpp 

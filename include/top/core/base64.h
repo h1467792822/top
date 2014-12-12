@@ -26,11 +26,26 @@ struct top_base64_ctx {
 	char padding;
 };
 
+static inline unsigned int top_base64_encoded_size(unsigned int size)
+{
+	return ((size + 2) / 3) << 2;
+}
+
+static inline unsigned int top_base64_decoded_size(unsigned int size)
+{
+	return ((size + 3) >> 2) * 3;
+}
+/**
+* etable,padding accept NULL
+*/
 void top_base64_ctx_encode_init(struct top_base64_ctx* ctx,pf_top_base64_output output,void* user_data, top_base64_encode_table etable,char padding);
 void top_base64_encode(struct top_base64_ctx* ctx, const char* in,int len);
 void top_base64_encode_string(struct top_base64_ctx* ctx, const char* in);
 void top_base64_encode_finish(struct top_base64_ctx* ctx);
 
+/**
+* etable,padding accept NULL
+*/
 void top_base64_ctx_decode_init(struct top_base64_ctx* ctx,pf_top_base64_output output,void* user_data,top_base64_decode_table dtable,char padding);
 int top_base64_decode(struct top_base64_ctx* ctx,const char* in,int len);
 int top_base64_decode_string(struct top_base64_ctx* ctx,const char* in);

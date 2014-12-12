@@ -4,283 +4,114 @@
 #include <string.h> //for memset
 #include <stdio.h>
 
+#define PREFIX_TREE_NODE( n ) ((struct top_prefix_tree_node*)(n & ~3))
+
+#define PREFIX_TREE_MAP_SLOT_SIZE 7
+#define PREFIX_TREE_MAP_KEY_SIZE (PREFIX_TREE_MAP_SLOT_SIZE * sizeof(void*))
+
 struct top_prefix_tree_node {
-	union {	
-	void* slots[1];
+    union {
+        char key[PREFIX_TREE_MAP_KEY_SIZE];
+        struct top_prefix_tree_node* slots[PREFIX_TREE_MAP_SLOT_SIZE];
+    };
+
+    union {
+        struct top_prefix_tree_node* next;
+        void* data;
+    };
+};
+
+struct top_prefix_tree_node_key {
 	struct {
-		struct top_prefix_tree_node* next;
-		int count;
+		void* data;
 	};
-	};
+	struct top_prefix_tree_node_key* next;
 };
 
-#define RADIX_TREE_PAGE_SIZE (4 * 1024)
-#define RADIX_TREE_NODE_COUNT_PER_PAGE (RADIX_TREE_PAGE_SIZE / sizeof(struct top_prefix_tree_node) )
-
-static top_error_t top_prefix_tree_def_malloc(void* data,unsigned long size,void** palloc)
-{
-	void* alloc = malloc(size);
-	if(alloc) {
-		*palloc = alloc;
-		return TOP_OK;
-	}
-	return TOP_ERROR(-1);
-}
-
-static void top_prefix_tree_def_free(void* data, void* alloc,unsigned long size)
-{
-	free(alloc);
-}
-
-static const struct top_prefix_tree_conf g_def_conf = {
-	.pfmalloc = top_prefix_tree_def_malloc,
-	.pffree = top_prefix_tree_def_free,
-	.max_capacity = (unsigned long)-1,
-};
-
-
-static top_error_t top_prefix_tree_alloc_node(struct top_prefix_tree* tree,struct top_prefix_tree_node** pnode)
-{
-	struct top_prefix_tree_node* node;
-	node = tree->cached;
-	if(tree->cached) {
-		node = tree->cached;
-		tree->cached = node->next;
-		node->next = 0;
-		*pnode = node;
-		return TOP_OK;
-	}
-	if(tree->bulk_alloc && tree->bulk_alloc->count) {
-		node = tree->bulk_alloc + tree->bulk_alloc->count--;
-		memset(node,0,sizeof(*node));
-		*pnode = node;
-		return TOP_OK;
-	}
-	if(tree->conf.max_capacity - RADIX_TREE_PAGE_SIZE > tree->capacity) {
-		top_error_t err = tree->conf.pfmalloc(tree->conf.user_data,RADIX_TREE_PAGE_SIZE,(void**)&node);
-		if(top_errno(err))
-			return err;
-		tree->capacity += RADIX_TREE_PAGE_SIZE;
-		node->next = tree->bulk_alloc;
-		node->count = RADIX_TREE_NODE_COUNT_PER_PAGE - 2;
-		tree->bulk_alloc = node;
-		node += RADIX_TREE_NODE_COUNT_PER_PAGE - 1;
-		memset(node,0,sizeof(*node));
-		*pnode = node;
-		return TOP_OK;
-	}
-	return top_make_error(-1);
-}
-
-static inline void top_prefix_tree_free_node(struct top_prefix_tree* tree,struct top_prefix_tree_node* node)
-{
-	node->next = tree->cached;
-	tree->cached = node;
-}
-
-void top_prefix_tree_init(struct top_prefix_tree* tree, const struct top_prefix_tree_conf* conf)
-{
-	memset(tree,0,sizeof(*tree));
-	if(conf) {
-		tree->conf = *conf;
-		if(tree->conf.pfmalloc == 0 || tree->conf.pffree == 0){
-			tree->conf.pfmalloc = g_def_conf.pfmalloc;
-			tree->conf.pffree = g_def_conf.pffree;
-		}
-	}else {
-		tree->conf = g_def_conf;
-	}
-}
-
-void top_prefix_tree_fini(struct top_prefix_tree* tree)
-{
-	struct top_prefix_tree_node* next;
-	struct top_prefix_tree_node* pos = tree->bulk_alloc;
-	for(; pos && (next = pos->next, 1); pos = next) {
-		tree->conf.pffree(tree->conf.user_data,pos,RADIX_TREE_PAGE_SIZE);
-	}
-	//memset(tree,0,sizeof(*tree));
-}
-
-static inline void** top_prefix_tree_find_slot(struct top_prefix_tree* tree,unsigned long key)
-{
-	int height = tree->height;
-	if(key > RADIX_TREE_MAX_KEY(height)) return 0;
-	struct top_prefix_tree_node** pslots = &tree->root; 
-	struct top_prefix_tree_node* slots;
-	int idx = 0;
-	unsigned long shift = (height - 1) * RADIX_TREE_MAP_SHIFT;
-	do {
-		--height;
-		slots = *pslots;
-		if(slots == 0) return 0;
-		idx =  (key >> shift ) & RADIX_TREE_MAP_MASK;
-		pslots = (struct top_prefix_tree_node**)&slots->slots[idx];
-		shift -= RADIX_TREE_MAP_SHIFT;
-	}while(height);	
-	return (void**)pslots;
-}
-
-static inline void top_prefix_tree_clear(struct top_prefix_tree* tree,unsigned long key,void* data)
-{
-	void** pdata = top_prefix_tree_find_slot(tree,key);
-	if(pdata) *pdata = data;
-}
-
-static inline top_error_t top_prefix_tree_extend(struct top_prefix_tree* tree, int height)
-{
-	struct top_prefix_tree_node* root;
-	struct top_prefix_tree_node* slots;
-	struct top_prefix_tree_node** pslots;
-	top_error_t err;
-	root = tree->root;
-	pslots = &tree->root;
-	for(; tree->height < height; ++tree->height) {
-		err = top_prefix_tree_alloc_node(tree,&slots);
-		if(top_errno(err)) {
-			goto fail;
-		}
-		*pslots = slots;
-		pslots = (struct top_prefix_tree_node**)&slots->slots[0];	
-	}
-	*pslots = root;
-	err = TOP_OK;
-out:
-	return err;
-fail:
-	if(tree->root != root) {
-		slots = tree->root;
-		tree->root = root;
-		do{
-			root = slots->slots[0];
-			slots->slots[0] = 0;
-			top_prefix_tree_free_node(tree,slots);
-			slots = root;
-		}while(slots);
-	}
-	goto out;
-}
-
-static inline void top_prefix_tree_shrink_from_top(struct top_prefix_tree* tree);
-
-top_error_t top_prefix_tree_insert(struct top_prefix_tree* tree,unsigned long key,void* data)
-{
-	top_error_t err;
-	if(0 == data) {
-		top_prefix_tree_clear(tree,key,data);
-		return TOP_OK;
-	}
-	struct top_prefix_tree_node** pslots,*slots;
-	int idx = 0;
-	int height = tree->height;
-	while(key >= RADIX_TREE_MAX_KEY(height)) {
-		++height;
-	}
-	if(height > tree->height) {
-		if(tree->root) {
-			err = top_prefix_tree_extend(tree,height);
-			if(top_errno(err)) return err;
-		}else{
-			tree->height = height;
-		}
-	}
-
-	struct top_prefix_tree_node** rollback[height];
-	memset(rollback,0,sizeof(*rollback) * height);
-	pslots = (struct top_prefix_tree_node**)&tree->root;
-	unsigned long shift = (height - 1) * RADIX_TREE_MAP_SHIFT;
-	do{
-		--height;
-		slots = *pslots;
-		if(slots == 0) {
-			err = top_prefix_tree_alloc_node(tree,&slots);
-			if(top_errno(err)) {
-				goto rollback;
-			}
-			*pslots = slots;
-			rollback[height] = pslots;
-		}
-		idx =  (key >> shift) & RADIX_TREE_MAP_MASK;
-		pslots = (struct top_prefix_tree_node**)&slots->slots[idx];
-		shift -= RADIX_TREE_MAP_SHIFT;
-	}while(height);
-	*pslots = data;
-	return TOP_OK;
-rollback:
-	for(++height; height < tree->height && rollback[height]; ++height) {
-		top_prefix_tree_free_node(tree,*rollback[height]);
-		*rollback[height] = 0;
-	}
-	top_prefix_tree_shrink_from_top(tree);
-	return err;
-}
-
-void* top_prefix_tree_find(struct top_prefix_tree* tree,unsigned long key)
-{
-	void** pdata = top_prefix_tree_find_slot(tree,key);
-	return pdata ? *pdata : 0;
-}
-
-static inline void top_prefix_tree_shrink(struct top_prefix_tree* tree, struct top_prefix_tree_node*** nodes)
-{
-	struct top_prefix_tree_node* slots;	
-	int i,j;
-	for(i = 0; i < tree->height; ++i) {
-		slots = *nodes[i];
-		for(j = 0; j < RADIX_TREE_MAP_SIZE; ++j) {
-			if(slots->slots[j]) return;
-		}
-		*nodes[i] = 0;
-		top_prefix_tree_free_node(tree,slots);
-	}
-	top_prefix_tree_shrink_from_top(tree);
-}
-
-static inline void top_prefix_tree_shrink_from_top(struct top_prefix_tree* tree)
-{
-	struct top_prefix_tree_node* slots;	
-	int j;
-	if(0 == tree->root) {
-		tree->height = 0;
-		return;
-	}
-	slots = tree->root;
-	do {
-		for(j = 1; j < RADIX_TREE_MAP_SIZE; ++j) {
-			if(slots->slots[j]) return;
-		}
-		if(tree->height > 1 || slots->slots[0] == 0) {
-			tree->root = slots->slots[0];
-			--tree->height;
-			top_prefix_tree_free_node(tree,slots);
-		}else {
-			return;
-		}
-	}while(slots);
-}
-
-void* top_prefix_tree_delete(struct top_prefix_tree* tree,unsigned long key)
-{
+struct top_prefix_tree_node_slots {
+	union {
+	struct top_prefix_tree_node_slots* slots[16];
+	struct {
+	struct top_prefix_tree_node_slots* small_slots[15];
 	void* data;
-	int height = tree->height;
-	if(key >= RADIX_TREE_MAX_KEY(height)) return 0;
-	struct top_prefix_tree_node** nodes[height];
-	struct top_prefix_tree_node** pslots = &tree->root;
-	struct top_prefix_tree_node* slots;
-	int idx = 0;
-	unsigned long shift = (height - 1) * RADIX_TREE_MAP_SHIFT;
-	do {
-		--height;
-		slots = *pslots;
-		if(slots == 0) return 0;
-		nodes[height] = pslots;
-		idx =  (key >> shift ) & RADIX_TREE_MAP_MASK;
-		pslots = (struct top_prefix_tree_node**)&slots->slots[idx];
-		shift -= RADIX_TREE_MAP_SHIFT;
-	}while(height);	
-	data = *pslots;
-	*pslots = 0;
-	top_prefix_tree_shrink(tree,nodes);
-	return data;
+	};
+	};
+	struct top_prefix_tree_node_slots* next;
+};
+
+union top_prefix_tree_node {
+	struct top_prefix_tree_node_key keys; /** sizeof(keys) == sizeof(slots) / 2 */
+	struct top_prefix_tree_node_slots slots;
+};
+
+enum top_prefix_match_result {
+	MATCHED = 0,
+	MATCH_NEXT , /** 本节点匹配成功，还需要继续匹配下个节点 */
+	MATCH_PARTIAL, /** 本节点部分匹配成功，如果是插入操作，需要分裂当前节点 */
+	UNMATCHED, /** 第一个字节就不匹配，如果是插入操作，需要生成新的节点 */
+};
+
+struct top_prefix_match_ctx {
+	unsigned long* pparent; /** 父节点，父节点的低位会记录当前节点的状态，是否有data，是否有压缩的key */
+	struct top_prefix_tree_node_key* current; /** 当前节点，因为内部是链表结构，这可能不是首节点 */
+	unsigned int matched_size; /** 当前key中成功匹配的数量 */
+	unsigned int max_size; /** 当前key的最大长度，首节点可能保存data数据，因此各个节点的长度是有可能有差异的 */
+	unsigned long* pnext; /** 本节点匹配完全成功后需要继续匹配的下一个节点的地址，它成为下一次匹配的pparent的值 */
+};
+
+static inline enum top_prefix_match_result top_prefix_tree_node_match(struct top_prefix_tree_node* node,const char* key,struct top_prefix_match_ctx* ctx)
+{
+	int has_compress_key = ctx->pparent & PREFIX_TREE_COMP_KEY;
+	int has_data = ctx->pparent & PREFIX_TREE_DATA;
+
+	if(has_compress_key) {
+		ctx->current = &node->key;
+		ctx->has_data = has_data;
+		return top_prefix_tree_node_match_key(key,ctx);
+	}else {
+		/** 当前节点匹配成功，直接转下个节点处理 */
+		ctx->pnext = top_prefix_tree_node_get_next_addr(node,*key,has_data);
+		if(*ctx->pnext) {
+			ctx->matched_size = 1;
+			return MATCH_NEXT;
+		}else {
+			ctx->matched_size = 0;
+			return UNMATCHED;
+		}
+	}
+}
+
+static inline enum top_prefix_match_result top_prefix_node_match_key(const char* key,struct top_prefix_match_ctx* ctx)
+{
+    int i;
+	unsigned int size = has_data ? PREFIX_TREE_MAP_KEY_SIZE - sizeof(void*) : PREFIX_TREE_MAP_KEY_SIZE;
+    do {
+        for(i = 0; i < size ++i) {
+            if(node->key[i] == 0) {
+                if(*key == 0) {
+                    goto matched;
+                } else {
+                    goto suffix;
+                }
+            } else if(*key == 0) {
+                goto prefix;
+            } else if(node->key[i] != *key) {
+                goto split;
+            }
+        }
+        node = node->next;
+    } while(1);
+}
+
+
+
+void * top_prefix_tree_simple_find(struct top_prefix_tree* tree, const char* key)
+{
+	if(tree->root == 0) return 0;
+	struct top_prefix_tree_match_ctx ctx;
+	memset(&ctx,0,sizeof(ctx));
+	ctx->pparent = &tree->root;
+	enum top_prefix_match_result rlt;
+	rlt = top_prefix_tree_node_match(&ctx,PREFIX_TREE_NODE(tree->root),key);
 }
 

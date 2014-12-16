@@ -8,7 +8,8 @@ libtop_core_la_SOURCES = \
 	avltree.c \
 	rbtree.c \
 	linux_rbtree.c \
-	radix_tree.c 
+	radix_tree.c \
+	prefix_tree.c
 
 if CHECK_TEST
 

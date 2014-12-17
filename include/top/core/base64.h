@@ -9,7 +9,7 @@ extern "C" {
 typedef void (*pf_top_base64_output)(void* user_data, const char* out,int len);
 
 typedef const char top_base64_encode_table[65]; /** include null char */
-typedef unsigned int top_base64_decode_table[256];
+typedef unsigned char top_base64_decode_table[256];
 
 void top_base64_decode_table_init(top_base64_decode_table dtable,top_base64_encode_table etable);
 
@@ -21,7 +21,7 @@ struct top_base64_ctx {
 	void* user_data;
 	union {
 	const char* etable;
-	const unsigned int* dtable;
+	const unsigned char* dtable;
 	};
 	char padding;
 };

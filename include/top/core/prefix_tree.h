@@ -10,22 +10,23 @@
 extern "C" {
 #endif
 
-/**
-* char_2_idx[c] :[ -1 ,0..(key_set_count - 1)]
-*/
-struct top_prefix_table {
-	unsigned char key_2_idx[256];
-	unsigned char key_set_count;
-	unsigned char idx_2_key[1];
-};
+typedef const char* top_prefix_tree_key_map_const;
+typedef unsigned char top_prefix_tree_slot_map[256];
+typedef const unsigned char top_prefix_tree_slot_map_const[256];
+
+void top_prefix_tree_slot_map_init(top_prefix_tree_slot_map slot_map, top_prefix_tree_key_map_const key_map, unsigned int key_map_size);
 
 /**
-* key: [0-9a-zA-Z.-_]*
-*/
-extern const struct top_prefix_table* const g_top_prefix_def_tabl;
-
+  * default is BASE64 CODEC:
+  * if slot_map == 0 || key_map == 0 then 
+  *    key_map = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+  *    slot_map = init with key_map
+  * end
+  */
 struct top_prefix_tree_conf {
-	const struct top_prefix_table* table; /** if null, instead of g_top_prefix_def_table */
+	top_prefix_tree_slot_map_const* slot_map; /** if null, instead of g_top_prefix_def_table */
+	top_prefix_tree_key_map_const key_map;
+	unsigned int key_map_size;
 	unsigned long max_capacity;
 	unsigned long max_length; /** max length of key */
 	/**
@@ -36,13 +37,17 @@ struct top_prefix_tree_conf {
 	void* user_data;
 };
 
-struct top_prefix_tree_node;
+struct top_prefix_tree_key;
+struct top_prefix_tree_slots;
 struct top_prefix_tree {
-	unsigned long capacity;
-	struct top_prefix_tree_node* root;
-	struct top_prefix_tree_node* cached;
-	struct top_prefix_tree_node* bulk_alloc;
-	struct top_prefix_tree_conf conf;
+	unsigned int capacity;
+	const unsigned short node_size;
+	const unsigned short max_key_size;
+	unsigned long root;
+	struct top_prefix_tree_key* cached_key;
+	struct top_prefix_tree_slots* cached_slots;
+	struct top_prefix_tree_slots* bulk_alloc;
+	const struct top_prefix_tree_conf conf;
 };
 
 
@@ -50,7 +55,7 @@ void top_prefix_tree_init(struct top_prefix_tree* tree, const struct top_prefix_
 
 void top_prefix_tree_fini(struct top_prefix_tree* tree);
 
-top_error_t top_prefix_tree_simple_insert(struct top_prefix_tree* tree, const char* key,void* data);
+top_error_t top_prefix_tree_simple_insert(struct top_prefix_tree* tree, const char* key,void* data,void** pold_data);
 
 void* top_prefix_tree_simple_find(struct top_prefix_tree* tree,const char* key);
 

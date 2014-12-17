@@ -28,9 +28,10 @@ class TestBase64: public CPPUNIT_NS::TestFixture
     CPPUNIT_TEST( testSimple );
     CPPUNIT_TEST( testSelfTable );
     CPPUNIT_TEST( testBase64 );
+    CPPUNIT_TEST( testDecode );
     CPPUNIT_TEST_SUITE_END();
 public:
-    void print_dtable(const unsigned int* dtable)
+    void print_dtable(const unsigned char* dtable)
     {
         return ;
         const char* etable = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWZYZ0123456789+/";
@@ -98,6 +99,18 @@ public:
             CPPUNIT_ASSERT_EQUAL(in[i],decoded[i]);
         }
     }
+	void testDecode() 
+	{
+		const char* encoded = "09524A673C067403120EB9935C6EB6F8=";
+		int decode_size = top_base64_decoded_size(strlen(encoded));
+		printf("\ne_size: %d,d_size: %d\n",strlen(encoded),decode_size);
+		char decode[decode_size];
+		char* decode_buf = decode;
+        top_base64_ctx ctx;
+		top_base64_ctx_decode_init(&ctx,on_base64_append,&decode_buf,0,0);
+        top_base64_decode(&ctx,encoded,strlen(encoded));
+		printf("\ndecoded: %*s\n",decode_size,decode);
+	}
 };
 
 CPPUNIT_TEST_SUITE_REGISTRATION( TestBase64 );

@@ -24,8 +24,8 @@ void top_prefix_tree_slot_map_init(top_prefix_tree_slot_map slot_map, top_prefix
   * end
   */
 struct top_prefix_tree_conf {
-	top_prefix_tree_slot_map_const* slot_map; /** if null, instead of g_top_prefix_def_table */
-	top_prefix_tree_key_map_const key_map;
+	const unsigned char* slot_map; /** if null, instead of g_top_prefix_def_table */
+	const char* key_map;
 	unsigned int key_map_size;
 	unsigned long max_capacity;
 	unsigned long max_length; /** max length of key */

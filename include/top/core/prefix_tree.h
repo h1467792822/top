@@ -41,13 +41,13 @@ struct top_prefix_tree_key;
 struct top_prefix_tree_slots;
 struct top_prefix_tree {
 	unsigned int capacity;
-	const unsigned short node_size;
-	const unsigned short max_key_size;
+	unsigned short node_size;
+	unsigned short max_key_size;
 	unsigned long root;
 	struct top_prefix_tree_key* cached_key;
 	struct top_prefix_tree_slots* cached_slots;
 	struct top_prefix_tree_slots* bulk_alloc;
-	const struct top_prefix_tree_conf conf;
+	struct top_prefix_tree_conf conf;
 };
 
 

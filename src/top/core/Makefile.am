@@ -28,7 +28,7 @@ coretestmain_SOURCES1 = test_main.cpp \
 			test_base64.cpp
 
 coretestmain_SOURCES = test_main.cpp \
-			test_base64.cpp 
+			test_prefix_tree.cpp 
 
 coretestmain_LDFLAGS = @CPPUNIT_LDFLAGS@ $(top_builddir)/src/top/core/libtop_core.la
 

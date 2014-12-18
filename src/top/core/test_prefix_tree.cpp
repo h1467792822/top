@@ -30,6 +30,7 @@ class TestPrefixTree: public CPPUNIT_NS::TestFixture
     CPPUNIT_TEST( testInsertReverseFind  );
     CPPUNIT_TEST( testDelete );
     CPPUNIT_TEST( testDeleteReverse );
+    CPPUNIT_TEST( testInsertLimitedCapacity );
     //CPPUNIT_TEST( testVisit );
     //CPPUNIT_TEST( testVisitWithoutSuffix );
     CPPUNIT_TEST_SUITE_END();
@@ -74,6 +75,28 @@ public:
         CPPUNIT_ASSERT_EQUAL((void*)tree.root,(void*)0);
 	}
 
+    void testInsertLimitedCapacity()
+    {
+		int count = 0;
+		tree.conf.max_capacity = 5 * 1024;
+        top_error_t err;
+        for(int i = 0; i < keys_cnt; ++i) {
+            err = top_prefix_tree_simple_insert(&tree,keys[i],(void*)keys[i],0);
+			if(top_errno(err)) {
+				if(count == 0) {
+					count = i;
+				cout << "insert : " << i << " keys" << endl;
+				}
+			}
+        }
+		cout << endl << "tree.capacity: " << tree.capacity << endl;
+        for(int i = 0; i < keys_cnt; ++i) {
+            void* found = top_prefix_tree_simple_find(&tree,keys[i]);
+			if(found == 0){
+				CPPUNIT_ASSERT(i >= count);
+			}
+        }
+    }
     void testInsertFind()
     {
         top_error_t err;

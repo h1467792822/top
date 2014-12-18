@@ -26,8 +26,9 @@ void top_prefix_tree_slot_map_init(top_prefix_tree_slot_map slot_map, top_prefix
 struct top_prefix_tree_conf {
 	const unsigned char* slot_map; /** if null, instead of g_top_prefix_def_table */
 	const char* key_map;
-	unsigned int key_map_size;
-	unsigned long max_capacity;
+	unsigned char key_map_size;
+	unsigned char bulk; /** 一次申请的node数量, 申请的内存 = bulk * tree->node_size ,if bulk == 0 then bulk = 10*/
+	unsigned long max_capacity; /** if max_capacity == 0 then max_capacity = (unsigned long)-1; */
 	unsigned long max_length; /** max length of key */
 	/**
 	* memory management, if pfmalloc or pffree is null, instead of malloc/free 
@@ -41,9 +42,9 @@ struct top_prefix_tree_key;
 struct top_prefix_tree_slots;
 struct top_prefix_tree {
 	unsigned int capacity;
+	unsigned int bulk_size;
 	unsigned short node_size;
 	unsigned short max_key_size;
-	//unsigned short height;
 	unsigned long root;
 	struct top_prefix_tree_key* cached_key;
 	struct top_prefix_tree_slots* cached_slots;

@@ -45,7 +45,7 @@
 #define PREFIX_TREE_NODE_KEY_IS_EOF_KEY(c) ((c) == PREFIX_TREE_NODE_KEY_EOF_KEY )
 
 
-#define PREFIX_TREE_PAGE_SIZE(tree) (8 * 1024)
+#define PREFIX_TREE_PAGE_SIZE(tree) (tree->bulk_size)
 
 static const unsigned char g_prefix_tree_key_map[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 static const unsigned char g_prefix_tree_slot_map[256] = {
@@ -190,16 +190,21 @@ static inline top_error_t top_prefix_tree_alloc_slots(struct top_prefix_tree* tr
         return TOP_OK;
     }
 
-    if(tree->conf.max_capacity - PREFIX_TREE_PAGE_SIZE(tree) < tree->capacity) {
+    if(tree->conf.max_capacity <= tree->capacity){
         return TOP_ERROR(-1);
     }
+
+	unsigned long bulk_size = tree->conf.max_capacity - tree->capacity;
+	if(bulk_size > tree->bulk_size) bulk_size = tree->bulk_size;
+	unsigned short avail_num = bulk_size / tree->node_size;
+	if(avail_num < 2) return TOP_ERROR(-1);
     top_error_t err;
     struct top_prefix_tree_slots* slots;
-    err = tree->conf.pfmalloc(tree->conf.user_data,PREFIX_TREE_PAGE_SIZE(tree),(void**)&slots);
+    err = tree->conf.pfmalloc(tree->conf.user_data,bulk_size,(void**)&slots);
     if(top_errno(err)) return err;
 
-    tree->capacity += PREFIX_TREE_PAGE_SIZE(tree);
-    slots->avail_num = (PREFIX_TREE_PAGE_SIZE(tree) / tree->node_size - 2);
+    tree->capacity += bulk_size;
+    slots->avail_num = avail_num - 2;
     slots->bulk_next = tree->bulk_alloc;
     tree->bulk_alloc = slots;
 
@@ -825,7 +830,7 @@ void top_prefix_tree_init(struct top_prefix_tree* tree,const struct top_prefix_t
     tree_conf = (struct top_prefix_tree_conf*)&tree->conf;
     if(conf) {
         *tree_conf = *conf;
-    }
+	}
     if(tree_conf->pfmalloc == 0 ||tree_conf->pffree == 0) {
         tree_conf->pfmalloc = top_prefix_tree_malloc;
         tree_conf->pffree = top_prefix_tree_free;
@@ -835,8 +840,13 @@ void top_prefix_tree_init(struct top_prefix_tree* tree,const struct top_prefix_t
         tree_conf->slot_map = g_prefix_tree_slot_map;
         tree_conf->key_map_size = 64;
     }
-    *(unsigned short*)&tree->node_size = PREFIX_TREE_NODE_SIZE(tree);
-    *(unsigned short*)&tree->max_key_size = PREFIX_TREE_NODE_KEY_MAX_SIZE(tree);
+	if(tree_conf->bulk == 0) tree_conf->bulk = 10;
+    tree->node_size = PREFIX_TREE_NODE_SIZE(tree);
+	tree->bulk_size = tree_conf->bulk * tree->node_size;
+    tree->max_key_size = PREFIX_TREE_NODE_KEY_MAX_SIZE(tree);
+	if(tree_conf->max_capacity == 0) {
+		tree_conf->max_capacity = (unsigned long)-1;
+	}
 }
 
 void top_prefix_tree_fini(struct top_prefix_tree* tree)

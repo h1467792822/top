@@ -43,6 +43,7 @@ struct top_prefix_tree {
 	unsigned int capacity;
 	unsigned short node_size;
 	unsigned short max_key_size;
+	//unsigned short height;
 	unsigned long root;
 	struct top_prefix_tree_key* cached_key;
 	struct top_prefix_tree_slots* cached_slots;

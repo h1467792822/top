@@ -158,6 +158,8 @@ struct top_prefix_tree_ctx {
     unsigned long* pparent; /** 祖父节点中记录的父节点的信息，在删除合并节点的时候可能要用到；在插入节点的时候可能需要使用它来修改父节点中slot的计数值 */
 };
 
+#define PREFIX_TREE_CTX_KEY_END(ctx,key) ( *key == 0 || key == ctx->end_key)
+
 static inline void top_prefix_tree_free_bulk(struct top_prefix_tree* tree)
 {
     struct top_prefix_tree_slots* slots ;

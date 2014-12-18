@@ -41,8 +41,8 @@ struct top_prefix_tree_conf {
 struct top_prefix_tree_key;
 struct top_prefix_tree_slots;
 struct top_prefix_tree {
-	unsigned int capacity;
-	unsigned int bulk_size;
+	unsigned long capacity;
+	unsigned short bulk_size;
 	unsigned short node_size;
 	unsigned short max_key_size;
 	unsigned long root;

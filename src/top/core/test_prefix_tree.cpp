@@ -85,7 +85,6 @@ public:
 			if(top_errno(err)) {
 				if(count == 0) {
 					count = i;
-				cout << "insert : " << i << " keys" << endl;
 				}
 			}
         }

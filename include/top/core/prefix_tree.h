@@ -67,18 +67,18 @@ typedef int (*pf_top_prefix_tree_visit)(void* visitor,struct top_prefix_tree* tr
 
 void top_prefix_tree_simple_visit(struct top_prefix_tree* tree, const char* prefix,int copy_suffix, pf_top_prefix_tree_visit pfvisit,void* visitor);
 
-struct top_prefix_key_vec{
+struct top_prefix_tree_key_vec{
 	const char* key;
-	unsigned int len;
+	const char* key_end;
 };
 
-top_error_t top_prefix_tree_insert(struct top_prefix_tree* tree,const struct top_prefix_key_vec* key,int count,void* data);
+top_error_t top_prefix_tree_insert(struct top_prefix_tree* tree,const struct top_prefix_tree_key_vec* key,int count,void* data);
 
-void* top_prefix_tree_find(struct top_prefix_tree* tree, const struct top_prefix_key_vec* key,int count);
+void* top_prefix_tree_find(struct top_prefix_tree* tree, const struct top_prefix_tree_key_vec* key,int count);
 
-void* top_prefix_tree_delete(struct top_prefix_tree* tree, const struct top_prefix_key_vec* key,int count);
+void* top_prefix_tree_delete(struct top_prefix_tree* tree, const struct top_prefix_tree_key_vec* key,int count);
 
-void top_prefix_tree_visit(struct top_prefix_tree* tree, const struct top_prefix_key_vec* prefix,int count,int copy_suffix, pf_top_prefix_tree_visit pfvisit,void* visitor);
+void top_prefix_tree_visit(struct top_prefix_tree* tree, const struct top_prefix_tree_key_vec* prefix,int count,int copy_suffix, pf_top_prefix_tree_visit pfvisit,void* visitor);
 
 #ifdef __cplusplus
 }

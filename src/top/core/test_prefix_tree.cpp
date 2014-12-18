@@ -9,6 +9,9 @@ using namespace std;
 static const char* keys[] = {
     "http+//www+huawei+com",
     "http+//w3+huawei+com/next/indexa+html",
+    "http+//h3+huawei+com/next/indexa+html",
+    "hwtp+//w3+huawei+com/next/indexa+html",
+    "wttp+//w3+huawei+com/next/indexa+html",
     "http+//w3+huawei+com/info/cn/doc/viewDoc+do/did/5759291/cata/21073",
     "https+//www+huawei+com/w3",
     "http+//3ms+huawei+com/hi/index+php/app/home/mod+Info/act+accountset/type/email",
@@ -16,7 +19,7 @@ static const char* keys[] = {
     "https+//www+google+com/index+html",
 };
 
-static const int keys_cnt = 2;// sizeof(keys)/ sizeof(keys[0]);
+static const int keys_cnt = sizeof(keys)/ sizeof(keys[0]);
 
 class TestPrefixTree: public CPPUNIT_NS::TestFixture
 {

@@ -12,7 +12,8 @@
 #define PREFIX_TREE_NODE_IS_KEY( n ) ( (unsigned long)(n) & KEY_NODE )
 #define PREFIX_TREE_GEN_NODE_KEY( n ) (((unsigned long)(n) | KEY_NODE))
 
-#define PREFIX_TREE_NODE_SIZE(tree) (((tree)->conf.key_map_size + 2) * sizeof(void*))
+#define PREFIX_TREE_NODE_SLOTS_ALIGN(n) (( (n) + 1) & ~1)
+#define PREFIX_TREE_NODE_SIZE(tree) ((PREFIX_TREE_NODE_SLOTS_ALIGN((tree)->conf.key_map_size) + 2) * sizeof(void*))
 #define PREFIX_TREE_NODE_SLOTS_KEY_SIZE (sizeof(void*) - 1)
 
 /**
@@ -29,9 +30,10 @@
  * 当前选择内部不提供预处理机制.
  *
   */
-#define PREFIX_TREE_NODE_KEY_MIN_SIZE() (2 * sizeof(void*))
+#define PREFIX_TREE_KEY_ALIGNMENT (2 * sizeof(void*))
+#define PREFIX_TREE_NODE_KEY_MIN_SIZE() (sizeof(void*))
 #define PREFIX_TREE_NODE_KEY_MAX_SIZE(tree) (tree->node_size - sizeof(void*))
-#define PREFIX_TREE_NODE_KEY_SIZE( key_len ) ( ((key_len) + sizeof(void*) - 1) & ~(sizeof(void*) - 1))
+#define PREFIX_TREE_NODE_KEY_SIZE( key_len ) ( ((key_len + sizeof(void*) + PREFIX_TREE_KEY_ALIGNMENT - 1) & ~(PREFIX_TREE_KEY_ALIGNMENT - 1)) - sizeof(void*))
 #define PREFIX_TREE_NODE_KEY_NEXT( key,key_len) ((struct top_prefix_tree_key*)((char*)(key) + sizeof(void*) + PREFIX_TREE_NODE_KEY_SIZE(key_len)))
 
 #define PREFIX_TREE_NODE_KEY_EOF_DATA 255
@@ -176,7 +178,7 @@ static inline top_error_t top_prefix_tree_alloc_slots(struct top_prefix_tree* tr
     if(tree->bulk_alloc && tree->bulk_alloc->avail_num) {
         *pslots = (struct top_prefix_tree_slots*)((char*)tree->bulk_alloc + tree->bulk_alloc->avail_num * tree->node_size);
         --tree->bulk_alloc->avail_num;
-		printf("\navail_num: %d\n",tree->bulk_alloc->avail_num);
+		printf("\navail_num: %lu\n",tree->bulk_alloc->avail_num);
         memset(*pslots,0,tree->node_size);
         return TOP_OK;
     }
@@ -193,7 +195,7 @@ static inline top_error_t top_prefix_tree_alloc_slots(struct top_prefix_tree* tr
     slots->avail_num = (PREFIX_TREE_PAGE_SIZE(tree) / tree->node_size - 2);
     slots->bulk_next = tree->bulk_alloc;
     tree->bulk_alloc = slots;
-	printf("\nnew bulk: %p,%d,%d\n",slots,slots->avail_num,tree->node_size);
+	printf("\nnew bulk: %p,%lu,%d\n",slots,slots->avail_num,tree->node_size);
 
     *pslots = (struct top_prefix_tree_slots*)((char*)slots + (slots->avail_num + 1) * tree->node_size);
     memset(*pslots,0,tree->node_size);
@@ -204,6 +206,7 @@ static inline void top_prefix_tree_free_key(struct top_prefix_tree* tree, struct
 {
 	printf("\nfree_key: %d\n",key_buf_size);
     assert(0 == (key_buf_size & (sizeof(void*) - 1)));
+	assert(0 == ((key_buf_size + sizeof(void*)) & ( sizeof(void*) * 2 - 1)));
     key->size = key_buf_size;
     key->next = tree->cached_key;
     tree->cached_key = key;
@@ -254,6 +257,7 @@ static inline void* top_prefix_tree_ctx_find(struct top_prefix_tree_ctx* ctx)
             if(ctx->slots == 0) return 0;
             rlt = top_prefix_tree_slots_match(ctx);
         }
+		printf("\n current nodes match result: %d\n",rlt);
         switch(rlt) {
         case MATCH_ALL:
             return top_prefix_tree_ctx_get_data(ctx);
@@ -283,6 +287,8 @@ static inline void top_prefix_tree_ctx_move_to_next(struct top_prefix_tree_ctx* 
     ctx->slots = 0;
     ctx->prev = 0;
     ctx->prev_end_pos = 0;
+
+	printf("\nmove_to_next: %p\n", (void*)*ctx->pself);
 }
 
 static inline void top_prefix_tree_ctx_rollback(struct top_prefix_tree_ctx* ctx,struct top_prefix_tree_ctx* rollback)
@@ -389,15 +395,14 @@ static inline enum top_prefix_match_result top_prefix_tree_slots_match(struct to
     int i;
     for(i = 0; i < PREFIX_TREE_NODE_SLOTS_KEY_SIZE; ++i)
     {
+		printf("\nslots match: compare: %c,%d == %c,%d, at %d\n",(char)tree_slots->key[i],tree_slots->key[i],(char)ctx->key[i],ctx->key[i],i);
+        if(tree_slots->key[i] == 0) {
+			break;
+        }
         if(tree_slots->key[i] != ctx->key[i]) {
             ctx->key += i;
             ctx->matched_size = i;
             return *ctx->key == 0 ? MATCH_PREFIX : MATCH_PARTIAL;
-        }
-        if(tree_slots->key[i] == 0) {
-			ctx->key += i;
-            ctx->matched_size = i;
-            return MATCH_ALL;
         }
     }
     ctx->matched_size = i;
@@ -437,11 +442,14 @@ static inline top_error_t top_prefix_tree_ctx_insert(struct top_prefix_tree_ctx*
         } else {
             ctx->slots = PREFIX_TREE_NODE_SLOTS(*ctx->pself);
             if(ctx->slots == 0) {
+				printf("\nnew leaf: %s\n",ctx->key);
                 err = top_prefix_tree_ctx_new_key(ctx,data);
+				printf("\nnew leaf: %d\n",top_errno(err));
                 goto fail;
             }
             rlt = top_prefix_tree_slots_match(ctx);
         }
+		printf("\n current nodes match result: %d\n",rlt);
         switch(rlt) {
         case MATCH_ALL:
             top_prefix_tree_ctx_set_data(ctx,data,pold_data);
@@ -493,6 +501,7 @@ static inline void top_prefix_tree_key_reclaim(struct top_prefix_tree* tree,stru
 {
     old_key_len = PREFIX_TREE_NODE_KEY_SIZE(old_key_len);
     new_key_len = PREFIX_TREE_NODE_KEY_SIZE(new_key_len);
+	printf("\n reclaim: old: %d,new: %d\n",old_key_len,new_key_len);
     if(old_key_len - new_key_len >= PREFIX_TREE_NODE_KEY_MIN_SIZE() + sizeof(void*)) {
         tree_key = (struct top_prefix_tree_key*)((char*)tree_key + new_key_len + sizeof(void*));
         top_prefix_tree_free_key(tree,tree_key,old_key_len - new_key_len - sizeof(void*));
@@ -509,8 +518,9 @@ static inline top_error_t top_prefix_tree_new_leaf(struct top_prefix_tree* tree,
 	new_key = tree_key;
     size = tree_key->size;
     copied_size = top_prefix_tree_strncpy(tree_key->key,key,size);
-	printf("\nnew key: %d,key: %s,copied: %d\n",size,key,copied_size);
+	printf("\nnew key: %d,key: %s,copied: %d,pkey:%p\n",size,key,copied_size,pkey);
     while(copied_size == size) {
+		assert(tree_key->next == 0);
         err = top_prefix_tree_alloc_key(tree,&next_key);
         if(top_errno(err)) goto fail;
         --size;
@@ -526,6 +536,7 @@ static inline top_error_t top_prefix_tree_new_leaf(struct top_prefix_tree* tree,
     tree_key->key[copied_size] = PREFIX_TREE_NODE_KEY_EOF_DATA;
     top_prefix_tree_key_reclaim(tree,tree_key,size,copied_size + 1);
 	*pkey = new_key;
+	printf("\n new leaf ok: %p\n",new_key);
     err = TOP_OK;
 out:
     return err;
@@ -555,7 +566,6 @@ static inline top_error_t top_prefix_tree_ctx_append_slots(struct top_prefix_tre
     struct top_prefix_tree_slots* slots;
     struct top_prefix_tree_ctx rollback;
     struct top_prefix_tree_key* current;
-    unsigned long* pself_old;
     err = top_prefix_tree_alloc_slots(ctx->tree,&slots);
     if(top_errno(err)) return err;
     assert(current->key[ctx->matched_size] == PREFIX_TREE_NODE_KEY_EOF_DATA);
@@ -633,12 +643,12 @@ static inline top_error_t top_prefix_tree_ctx_split_slots(struct top_prefix_tree
 {
     top_error_t err;
     struct top_prefix_tree_slots* slots;
-	printf("\n%s, 1 split_key before alloc_slots:%d \n",__func__,top_errno(err));
+	printf("\n%s, 1 split_slots before alloc_slots:%d \n",__func__,top_errno(err));
     assert(ctx->slots->key[ctx->matched_size]);
     assert(ctx->matched_size < PREFIX_TREE_NODE_SLOTS_KEY_SIZE);
     err = top_prefix_tree_alloc_slots(ctx->tree,&slots);
     if(top_errno(err)) return err;
-	printf("\n%s, 2 split_key before alloc_slots:%d \n",__func__,top_errno(err));
+	printf("\n%s, 2 split_slots before alloc_slots:%d \n",__func__,top_errno(err));
 
     slots->data = data;
     if(ctx->prev) {
@@ -646,9 +656,11 @@ static inline top_error_t top_prefix_tree_ctx_split_slots(struct top_prefix_tree
     } else {
         *ctx->pself = (unsigned long)slots;
     }
-	printf("\n%s, 3 split_key before alloc_slots:%d \n",__func__,top_errno(err));
+	memcpy(slots->key,ctx->slots->key,ctx->matched_size);
+	slots->key[ctx->matched_size] = 0; /** don't warry about overring slots->slots */
+	printf("\n%s, 3 split_slots before alloc_slots:%d \n",__func__,top_errno(err));
     top_prefix_tree_slots_link_slots(ctx->tree,slots,ctx->slots->key[ctx->matched_size],ctx->slots);
-	printf("\n%s, 4 split_key before alloc_slots:%d \n",__func__,top_errno(err));
+	printf("\n%s, 4 split_slots before alloc_slots:%d \n",__func__,top_errno(err));
     top_prefix_tree_slots_remove(ctx->slots,0,ctx->matched_size + 1);
     *pslots = slots;
     return TOP_OK;
@@ -712,17 +724,18 @@ static inline top_error_t top_prefix_tree_ctx_split_key(struct top_prefix_tree_c
     char c = ctx->current->key[ctx->matched_size];
     switch(ctx->current->key[ctx->matched_size + 1]) {
     case PREFIX_TREE_NODE_KEY_EOF:
-		printf("\n%s, link original node: PREFIX_TREE_NODE_KEY_EOF\n",__func__);
+		printf("\n%s, %d, link original node: PREFIX_TREE_NODE_KEY_EOF\n",__func__,ctx->matched_size + 1);
         top_prefix_tree_slots_link_slots(ctx->tree,slots,c,ctx->current->next);
         top_prefix_tree_free_key(ctx->tree,ctx->current,PREFIX_TREE_NODE_KEY_SIZE(ctx->matched_size+1));
         break;
     case PREFIX_TREE_NODE_KEY_EOF_KEY:
-		printf("\n%s, link original node: PREFIX_TREE_NODE_KEY_EOF_KEY\n",__func__);
+		printf("\n%s, %d, link original node: PREFIX_TREE_NODE_KEY_EOF_KEY\n",__func__,ctx->matched_size + 1);
         top_prefix_tree_slots_link_key(ctx->tree,slots,c,ctx->current->next);
         top_prefix_tree_free_key(ctx->tree,ctx->current,PREFIX_TREE_NODE_KEY_SIZE(ctx->matched_size+1));
+		break;
     default:
-		printf("\n%s, link original node: PREFIX_TREE_NODE_KEY_EOF\n",__func__);
-        if(((ctx->matched_size + 1) & (sizeof(void*) - 1)) == 0) {
+		printf("\n%s, %d, link original node \n",__func__,ctx->matched_size + 1);
+        if(ctx->matched_size > PREFIX_TREE_NODE_KEY_MIN_SIZE() && ((ctx->matched_size + 1) & (sizeof(void*) - 1)) == 0) {
             tree_key = PREFIX_TREE_NODE_KEY_NEXT(ctx->current,ctx->matched_size + 1 - sizeof(void*));
             top_prefix_tree_slots_link_key(ctx->tree,slots,c,tree_key);
             top_prefix_tree_free_key(ctx->tree,ctx->current,ctx->matched_size + 1 - sizeof(void*));
@@ -761,16 +774,13 @@ static inline top_error_t top_prefix_tree_ctx_split_node(struct top_prefix_tree_
 {
     struct top_prefix_tree_slots* slots;
     struct top_prefix_tree_key* new_leaf;
-    unsigned long* pself_old;
     unsigned char c = *ctx->key++;
     top_error_t err;
 
-	printf("\n%s\n",__func__);
-    pself_old = ctx->pself;
-    ctx->pself = &new_leaf;
+	printf("\n%s:ctx->key:%s:ctx->matched_size: %d,ctx->slots: %p\n",__func__,ctx->key,ctx->matched_size,ctx->slots);
     err = top_prefix_tree_new_leaf(ctx->tree,ctx->key,data,&new_leaf);
     if(top_errno(err)) return err;
-	printf("\nsplit: match_size=%d,slots: %p,current:%p,%p\n",ctx->matched_size,ctx->slots,ctx->current,ctx->current->next);
+	printf("\nsplit: match_size=%d,slots: %p,current:%p,%p\n",ctx->matched_size,ctx->slots,ctx->current,ctx->current ? ctx->current->next : (void*)0);
     if(ctx->matched_size == 0) {
         err = top_prefix_tree_ctx_insert_slots(ctx,0,&slots);
     } else if(ctx->slots) {
@@ -779,7 +789,7 @@ static inline top_error_t top_prefix_tree_ctx_split_node(struct top_prefix_tree_
         err = top_prefix_tree_ctx_split_key(ctx,0,&slots);
     }
     if(top_errno(err)) goto fail;
-    top_prefix_tree_slots_link_key(ctx->tree,slots,c,PREFIX_TREE_NODE_KEY(new_leaf));
+    top_prefix_tree_slots_link_key(ctx->tree,slots,c,new_leaf);
     return TOP_OK;
 fail: {
         struct top_prefix_tree_key* tree_key;

@@ -63,16 +63,16 @@ void* top_prefix_tree_simple_find(struct top_prefix_tree* tree,const char* key);
 
 void* top_prefix_tree_simple_delete(struct top_prefix_tree* tree,const char* key);
 
-typedef int (*pf_top_prefix_tree_visit)(void* visitor,struct top_prefix_tree* tree,const char* suffix, int suffix_len,void* data);
+typedef int (*pf_top_prefix_tree_visit)(void* visitor,struct top_prefix_tree* tree,const char* prefix,const char* suffix, int suffix_len,void* data);
 
-void top_prefix_tree_simple_visit(struct top_prefix_tree* tree, const char* prefix,int copy_suffix, pf_top_prefix_tree_visit pfvisit,void* visitor);
+void top_prefix_tree_simple_visit(struct top_prefix_tree* tree, const char* prefix,char* suffix,int len, pf_top_prefix_tree_visit pfvisit,void* visitor);
 
 struct top_prefix_tree_key_vec{
 	const char* key;
 	const char* key_end;
 };
 
-top_error_t top_prefix_tree_insert(struct top_prefix_tree* tree,const struct top_prefix_tree_key_vec* key,int count,void* data);
+top_error_t top_prefix_tree_insert(struct top_prefix_tree* tree,const struct top_prefix_tree_key_vec* key,int count,void* data,void** pold_data);
 
 void* top_prefix_tree_find(struct top_prefix_tree* tree, const struct top_prefix_tree_key_vec* key,int count);
 

@@ -66,6 +66,7 @@ class TestPrefixTree: public CPPUNIT_NS::TestFixture
     CPPUNIT_TEST( testInsertReverseFind  );
     CPPUNIT_TEST( testDelete );
     CPPUNIT_TEST( testDeleteReverse );
+	CPPUNIT_TEST( testSelfMap );
     CPPUNIT_TEST( testInsertLimitedCapacity );
     //CPPUNIT_TEST( testVisit );
     //CPPUNIT_TEST( testVisitWithoutSuffix );
@@ -80,12 +81,48 @@ public:
     {
         top_prefix_tree_fini(&tree);
     }
+	void testSelfMap()
+	{
+		struct top_prefix_tree tree;
+		top_prefix_tree_slot_map slot_map;
+		const char* key_map = "abcdefghijklmnopqrstuvwxyz0123456789.";
+		top_prefix_tree_slot_map_init(slot_map,key_map,-1);
+		top_prefix_tree_slot_map_init_more(slot_map,'a',"ABCDEFGHIJKLMNOPQRSTUVWXYZ",-1);
+		top_prefix_tree_slot_map_init_more(slot_map,'.',"/",-1);
+		top_prefix_tree_slot_map_init_more(slot_map,'.',"-",-1);
+		top_prefix_tree_slot_map_init_more(slot_map,'.',"_",-1);
+		top_prefix_tree_slot_map_init_more(slot_map,'.',":",-1);
+		struct top_prefix_tree_conf conf;
+		memset(&conf,0,sizeof(conf));
+		conf.key_map = key_map;
+		conf.key_map_size = strlen(conf.key_map);
+		conf.slot_map = slot_map;
+		top_prefix_tree_init(&tree,&conf);	
+
+		top_error_t err;
+		err = top_prefix_tree_simple_insert(&tree,"http://www.huawei.com",(void*)101,0);
+		CPPUNIT_ASSERT_EQUAL(0,top_errno(err));
+		void* old;
+		err = top_prefix_tree_simple_insert(&tree,"htTp.-_www.Huawei.cOM",(void*)100,&old);
+		CPPUNIT_ASSERT_EQUAL(0,top_errno(err));
+		CPPUNIT_ASSERT_EQUAL(old,(void*)101);
+		void* found = top_prefix_tree_simple_find(&tree,"HTTP../WWW/huawei.Com");
+		CPPUNIT_ASSERT_EQUAL(found,(void*)100);
+		void* del = top_prefix_tree_simple_delete(&tree,"HTTP../WWW/huawei.Com");
+		CPPUNIT_ASSERT_EQUAL(found,del);
+		CPPUNIT_ASSERT_EQUAL(tree.root,(unsigned long)0);
+	}
+
     void testOne()
     {
         top_error_t err;
         int idx = keys_cnt/2;
-        err = top_prefix_tree_simple_insert(&tree,keys[idx],(void*)1,0);
+        err = top_prefix_tree_simple_insert(&tree,keys[idx],(void*)9,0);
         CPPUNIT_ASSERT_EQUAL(top_errno(err),0);
+		void* old;
+        err = top_prefix_tree_simple_insert(&tree,keys[idx],(void*)1,&old);
+        CPPUNIT_ASSERT_EQUAL(top_errno(err),0);
+        CPPUNIT_ASSERT_EQUAL((unsigned long)old,9ul);
         void* found = top_prefix_tree_simple_find(&tree,keys[idx]);
         void* del = top_prefix_tree_simple_delete(&tree,keys[idx]);
         CPPUNIT_ASSERT_EQUAL(found,del);

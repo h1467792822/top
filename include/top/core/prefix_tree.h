@@ -14,7 +14,15 @@ typedef const char* top_prefix_tree_key_map_const;
 typedef unsigned char top_prefix_tree_slot_map[256];
 typedef const unsigned char top_prefix_tree_slot_map_const[256];
 
-void top_prefix_tree_slot_map_init(top_prefix_tree_slot_map slot_map, top_prefix_tree_key_map_const key_map, unsigned int key_map_size);
+/**
+  * 如果只想支持小写字母，但输入可能有大写，不想事先遍历进行预处理，则可以如下:
+  * top_prefix_tree_slot_map_init(slot_map,"abcdefghijklmnopqrstuvwxyz",-1);
+  * top_prefix_tree_slot_map_init_more_key(slot_map,'a',"ABCDEFGHIJKLMNOPQRSTUVWXYZ",-1);
+  * 内部比较的时候则会将小写和大写字母完全等同对待.
+  * 要支持这个功能，库编译时需要定义#define TOP_PREFIX_TREE_HAS_MORE_KEY_MAP 1
+  */
+void top_prefix_tree_slot_map_init(top_prefix_tree_slot_map slot_map, const char* key_map, unsigned int key_map_size);
+void top_prefix_tree_slot_map_init_more(top_prefix_tree_slot_map slot_map,char equal_start_key,const char* more_key_map,unsigned int key_map_size);
 
 /**
   * default is BASE64 CODEC:

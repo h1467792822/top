@@ -1162,7 +1162,8 @@ static int top_prefix_tree_visit_children(struct top_prefix_tree* tree,struct to
     unsigned long node;
     struct top_prefix_tree_visit_data data;
     struct top_prefix_tree_visit_data* current;
-    while(rlt && size && (current = &stack[--size])) {
+    while(rlt && size ) {
+		current = &stack[--size];
         data = *current;
         if(data.slot_idx < tree->conf.key_map_size - 1) {
             ++current->pself;

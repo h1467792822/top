@@ -71,9 +71,22 @@ void* top_prefix_tree_simple_find(struct top_prefix_tree* tree,const char* key);
 
 void* top_prefix_tree_simple_delete(struct top_prefix_tree* tree,const char* key);
 
-typedef int (*pf_top_prefix_tree_visit)(void* visitor,struct top_prefix_tree* tree,const char* prefix,const char* suffix, int suffix_len,void* data);
+/**
+  * 根据前缀遍历所有节点
+  */
+struct top_prefix_tree_visit_ctx
+{
+	/**
+	  * @suffix_length 指示后缀的真实长度，即便suffix_buf为空指针，也会提供这个值
+	  * @return 0 表示中断visit，非0值表示继续。如果需要返回错误码，用户可以使用user_data来实现.
+	  */
+	int (*visit)(struct top_prefix_tree_visit_ctx* ctx,void* data,int suffix_length,struct top_prefix_tree* tree);
+	void* user_data;
+	char* suffix_buf; //用于拷贝后缀，可以为空指针表示无需拷贝
+	int suffix_buf_len;
+};
 
-void top_prefix_tree_simple_visit(struct top_prefix_tree* tree, const char* prefix,char* suffix,int len, pf_top_prefix_tree_visit pfvisit,void* visitor);
+int top_prefix_tree_simple_visit(struct top_prefix_tree* tree, const char* prefix,struct top_prefix_tree_visit_ctx* ctx);
 
 struct top_prefix_tree_key_vec{
 	const char* key;
@@ -86,7 +99,7 @@ void* top_prefix_tree_find(struct top_prefix_tree* tree, const struct top_prefix
 
 void* top_prefix_tree_delete(struct top_prefix_tree* tree, const struct top_prefix_tree_key_vec* key,int count);
 
-void top_prefix_tree_visit(struct top_prefix_tree* tree, const struct top_prefix_tree_key_vec* prefix,int count,int copy_suffix, pf_top_prefix_tree_visit pfvisit,void* visitor);
+int top_prefix_tree_visit(struct top_prefix_tree* tree, const struct top_prefix_tree_key_vec* prefix,int count,struct top_prefix_tree_visit_ctx* ctx);
 
 #ifdef __cplusplus
 }

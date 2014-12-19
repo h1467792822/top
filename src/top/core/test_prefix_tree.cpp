@@ -10,6 +10,11 @@ using namespace std;
 static const char* keys[] = {
     "http+//www+huawei+com",
     "http+//w3+huawei+com/info/cn/doc/viewDoc+do/did/5759291/cata/21073",
+    "https+//www+huawei+com/w3",
+    "http+//3ms+huawei+com/hi/index+php/app/home/mod+Info/act+accountset/type/email",
+    "https+//www+baidu+com/index+html",
+    "https+//www+google+com/index+html",
+#if 1
     "http+//w3+huawei+com/next/indexa+html",
     "http+//w3+huawei+com/next/indexa+htma",
     "http+//w3+huawei+com/next/indexa+htal",
@@ -48,10 +53,7 @@ static const char* keys[] = {
     "htjp+//w3+huawei+com/next/indexa+html",
     "hwtp+//w3+huawei+com/next/indexa+html",
     "wttp+//w3+huawei+com/next/indexa+html",
-    "https+//www+huawei+com/w3",
-    "http+//3ms+huawei+com/hi/index+php/app/home/mod+Info/act+accountset/type/email",
-    "https+//www+baidu+com/index+html",
-    "https+//www+google+com/index+html",
+#endif
 };
 
 static const int keys_cnt = sizeof(keys)/ sizeof(keys[0]);
@@ -68,8 +70,8 @@ class TestPrefixTree: public CPPUNIT_NS::TestFixture
     CPPUNIT_TEST( testDeleteReverse );
 	CPPUNIT_TEST( testSelfMap );
     CPPUNIT_TEST( testInsertLimitedCapacity );
-    //CPPUNIT_TEST( testVisit );
-    //CPPUNIT_TEST( testVisitWithoutSuffix );
+    CPPUNIT_TEST( testVisit );
+    CPPUNIT_TEST( testVisitWithoutSuffix );
     CPPUNIT_TEST_SUITE_END();
     struct top_prefix_tree tree;
 public:
@@ -100,6 +102,12 @@ public:
 		top_prefix_tree_init(&tree,&conf);	
 
 		top_error_t err;
+		err = top_prefix_tree_simple_insert(&tree,"hatp://www.huawei.com",(void*)101,0);
+		CPPUNIT_ASSERT_EQUAL(0,top_errno(err));
+		err = top_prefix_tree_simple_insert(&tree,"http://wtw.huawei.com",(void*)101,0);
+		CPPUNIT_ASSERT_EQUAL(0,top_errno(err));
+		err = top_prefix_tree_simple_insert(&tree,"http:n/www.huawei.com",(void*)101,0);
+		CPPUNIT_ASSERT_EQUAL(0,top_errno(err));
 		err = top_prefix_tree_simple_insert(&tree,"http://www.huawei.com",(void*)101,0);
 		CPPUNIT_ASSERT_EQUAL(0,top_errno(err));
 		void* old;
@@ -110,6 +118,12 @@ public:
 		CPPUNIT_ASSERT_EQUAL(found,(void*)100);
 		void* del = top_prefix_tree_simple_delete(&tree,"HTTP../WWW/huawei.Com");
 		CPPUNIT_ASSERT_EQUAL(found,del);
+		del = top_prefix_tree_simple_delete(&tree,"hatp://wWw.huawei.com");
+		CPPUNIT_ASSERT_EQUAL((void*)101,del);
+		del = top_prefix_tree_simple_delete(&tree,"http:/:wTw.huawei.com");
+		CPPUNIT_ASSERT_EQUAL((void*)101,del);
+		del = top_prefix_tree_simple_delete(&tree,"http:N/www.huawei.com");
+		CPPUNIT_ASSERT_EQUAL((void*)101,del);
 		CPPUNIT_ASSERT_EQUAL(tree.root,(unsigned long)0);
 	}
 
@@ -176,7 +190,66 @@ public:
             err = top_prefix_tree_simple_insert(&tree,keys[i],(void*)keys[i],0);
             CPPUNIT_ASSERT_EQUAL(top_errno(err),0);
         }
+        for(int i = 0; i < keys_cnt; ++i) {
+            void* found = top_prefix_tree_simple_find(&tree,keys[i]);
+            CPPUNIT_ASSERT_EQUAL(found,(void*)keys[i]);
+        }
+    }
+	struct counter {
+		int count;
+		int len;
+	};
+	static int visit_no_buf(struct top_prefix_tree_visit_ctx* ctx,void* data, int suffix_len, struct top_prefix_tree* tree)
+	{
+		struct counter * pc = (counter*)ctx->user_data;
+		pc->count++;
+		pc->len += suffix_len;
+		return 1;	
+	}
+
+    void testVisitWithoutSuffix()
+    {
+        top_error_t err;
+        for(int i = 0; i < keys_cnt; ++i) {
+            err = top_prefix_tree_simple_insert(&tree,keys[i],(void*)keys[i],0);
+            CPPUNIT_ASSERT_EQUAL(top_errno(err),0);
+        }
 		cout << endl << "tree.capacity: " << tree.capacity << endl;
+		struct counter counter = { 0,0};
+		struct top_prefix_tree_visit_ctx ctx;
+		memset(&ctx,0,sizeof(ctx));
+		ctx.suffix_buf = 0;
+		ctx.suffix_buf_len = 0;
+		ctx.visit = visit_no_buf;
+		ctx.user_data = &counter;
+		top_prefix_tree_simple_visit(&tree,"https",&ctx);
+		cout << endl << "-- visit ,total count = " << counter.count << ", Total Len: " << counter.len  << ", keycount: " << keys_cnt << endl;
+        for(int i = 0; i < keys_cnt; ++i) {
+            void* found = top_prefix_tree_simple_find(&tree,keys[i]);
+            CPPUNIT_ASSERT_EQUAL(found,(void*)keys[i]);
+        }
+    }
+	static int visit(struct top_prefix_tree_visit_ctx* ctx,void* data, int suffix_len, struct top_prefix_tree* tree)
+	{
+		printf("\nvisit: %*s\n", suffix_len > ctx->suffix_buf_len ? ctx->suffix_buf_len : suffix_len, ctx->suffix_buf);
+		return ctx->suffix_buf[suffix_len - 1] != 'm';	
+	}
+
+    void testVisit()
+    {
+        top_error_t err;
+        for(int i = 0; i < keys_cnt; ++i) {
+            err = top_prefix_tree_simple_insert(&tree,keys[i],(void*)keys[i],0);
+            CPPUNIT_ASSERT_EQUAL(top_errno(err),0);
+        }
+		cout << endl << "tree.capacity: " << tree.capacity << endl;
+		char buf[2048];
+		struct top_prefix_tree_visit_ctx ctx;
+		memset(&ctx,0,sizeof(ctx));
+		ctx.suffix_buf = buf;
+		ctx.suffix_buf_len = 2048;
+		ctx.visit = visit;
+		top_prefix_tree_simple_visit(&tree,"http",&ctx);
         for(int i = 0; i < keys_cnt; ++i) {
             void* found = top_prefix_tree_simple_find(&tree,keys[i]);
             CPPUNIT_ASSERT_EQUAL(found,(void*)keys[i]);
@@ -260,13 +333,6 @@ public:
             CPPUNIT_ASSERT_EQUAL(found,(void*)0);
         }
 	}
-
-    void testVisit()
-    {
-    }
-    void testVisitWithoutSuffix()
-    {
-    }
 };
 
 CPPUNIT_TEST_SUITE_REGISTRATION( TestPrefixTree );

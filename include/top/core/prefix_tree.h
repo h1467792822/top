@@ -82,8 +82,8 @@ struct top_prefix_tree_visit_ctx
 	  */
 	int (*visit)(struct top_prefix_tree_visit_ctx* ctx,void* data,int suffix_length,struct top_prefix_tree* tree);
 	void* user_data;
-	char* suffix_buf; //用于拷贝后缀，可以为空指针表示无需拷贝
-	int suffix_buf_len;
+	char* suffix_buf; //用于拷贝后缀
+	int suffix_buf_len; // == 0, 表示无需拷贝
 };
 
 int top_prefix_tree_simple_visit(struct top_prefix_tree* tree, const char* prefix,struct top_prefix_tree_visit_ctx* ctx);

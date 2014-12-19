@@ -283,7 +283,7 @@ static inline top_error_t top_prefix_tree_alloc_slots(struct top_prefix_tree* tr
 
     tree->capacity += bulk_size;
     slots->avail_num = avail_num - 2;
-	slots->bulk_size = bulk_size;
+    slots->bulk_size = bulk_size;
     slots->bulk_next = tree->bulk_alloc;
     tree->bulk_alloc = slots;
 
@@ -596,7 +596,7 @@ static inline void top_prefix_tree_key_destroy(struct top_prefix_tree* tree, str
             break;
         case PREFIX_TREE_NODE_KEY_EOF:
             top_prefix_tree_free_key(tree,tree_key,PREFIX_TREE_NODE_KEY_SIZE(i + 1));
-			assert(0);
+            assert(0);
             return;
         case PREFIX_TREE_NODE_KEY_EOF_DATA:
             top_prefix_tree_free_key(tree,tree_key,PREFIX_TREE_NODE_KEY_SIZE(i + 1));
@@ -1097,39 +1097,38 @@ void* top_prefix_tree_delete(struct top_prefix_tree* tree, const struct top_pref
     return top_prefix_tree_ctx_delete(&ctx);
 }
 
-struct top_prefix_tree_visit_data
-{
-	unsigned long* pself;
-	unsigned int key_start;
-	unsigned char slot_idx;
+struct top_prefix_tree_visit_data {
+    unsigned long* pself;
+    unsigned int key_start;
+    unsigned char slot_idx;
 };
 
 #define PREFIX_TREE_VISIT_DEEP 64 //栈的最大深度，超过之后采用递归调用的方式完成
 
 static inline int top_prefix_tree_visit_stack_push(struct top_prefix_tree_visit_data* stack,int* size, unsigned long* pself,unsigned int key_start,unsigned char slot_idx)
 {
-	if(*size == PREFIX_TREE_VISIT_DEEP) return 0;
-	stack += (*size)++;
-	stack->pself = pself;
-	stack->key_start = key_start;
-	stack->slot_idx = slot_idx;
-	return 1;
+    if(*size == PREFIX_TREE_VISIT_DEEP) return 0;
+    stack += (*size)++;
+    stack->pself = pself;
+    stack->key_start = key_start;
+    stack->slot_idx = slot_idx;
+    return 1;
 }
 
-static inline void top_prefix_tree_visit_ctx_set_suffix(struct top_prefix_tree_visit_ctx* ctx, int pos,char c) 
+static inline void top_prefix_tree_visit_ctx_set_suffix(struct top_prefix_tree_visit_ctx* ctx, int pos,char c)
 {
-	if(pos < ctx->suffix_buf_len) ctx->suffix_buf[pos] = c;
+    if(pos < ctx->suffix_buf_len) ctx->suffix_buf[pos] = c;
 }
 
-static inline void top_prefix_tree_visit_ctx_append_suffix(struct top_prefix_tree_visit_ctx* ctx, int* pos,char c) 
+static inline void top_prefix_tree_visit_ctx_append_suffix(struct top_prefix_tree_visit_ctx* ctx, int* pos,char c)
 {
-	int npos = (*pos)++;
-	if(npos < ctx->suffix_buf_len) ctx->suffix_buf[npos] = c;
+    int npos = (*pos)++;
+    if(npos < ctx->suffix_buf_len) ctx->suffix_buf[npos] = c;
 }
 static inline int top_prefix_tree_visit_ctx_visit(struct top_prefix_tree_visit_ctx* ctx, void* data,int pos,struct top_prefix_tree* tree)
 {
-	if(pos < ctx->suffix_buf_len) ctx->suffix_buf[pos] = 0;
-	return ctx->visit(ctx,data,pos,tree);
+    if(pos < ctx->suffix_buf_len) ctx->suffix_buf[pos] = 0;
+    return ctx->visit(ctx,data,pos,tree);
 }
 
 static int top_prefix_tree_visit_children(struct top_prefix_tree* tree,struct top_prefix_tree_visit_data* stack,int size,struct top_prefix_tree_visit_ctx* ctx);
@@ -1138,124 +1137,124 @@ static int top_prefix_tree_visit_slots(struct top_prefix_tree* tree,struct top_p
 
 static int top_prefix_tree_visit_node(struct top_prefix_tree* tree,unsigned long node,struct top_prefix_tree_visit_ctx* ctx, int pos)
 {
-	struct top_prefix_tree_visit_data stack[PREFIX_TREE_VISIT_DEEP];
-	int size = 0;
-	(void)top_prefix_tree_visit_stack_push(stack,&size,&node,pos,tree->conf.key_map_size);
-	return top_prefix_tree_visit_children(tree,stack,size,ctx);
+    struct top_prefix_tree_visit_data stack[PREFIX_TREE_VISIT_DEEP];
+    int size = 0;
+    (void)top_prefix_tree_visit_stack_push(stack,&size,&node,pos,tree->conf.key_map_size);
+    return top_prefix_tree_visit_children(tree,stack,size,ctx);
 }
 
 static inline int top_prefix_tree_visit_match_continue(struct top_prefix_tree_visit_ctx* ctx, struct top_prefix_tree_ctx* match_ctx)
 {
-	struct top_prefix_tree_visit_data stack[PREFIX_TREE_VISIT_DEEP];
-	int size = 0;
-	if(match_ctx->slots) {
-		top_prefix_tree_visit_slots(match_ctx->tree,match_ctx->slots,match_ctx->matched_size,stack,&size,ctx,0);
-	}else {
-		top_prefix_tree_visit_key(match_ctx->tree,match_ctx->current,match_ctx->matched_size,stack,&size,ctx,0);
-	}
-	return top_prefix_tree_visit_children(match_ctx->tree,stack,size,ctx);
+    struct top_prefix_tree_visit_data stack[PREFIX_TREE_VISIT_DEEP];
+    int size = 0;
+    if(match_ctx->slots) {
+        top_prefix_tree_visit_slots(match_ctx->tree,match_ctx->slots,match_ctx->matched_size,stack,&size,ctx,0);
+    } else {
+        top_prefix_tree_visit_key(match_ctx->tree,match_ctx->current,match_ctx->matched_size,stack,&size,ctx,0);
+    }
+    return top_prefix_tree_visit_children(match_ctx->tree,stack,size,ctx);
 }
 
 static int top_prefix_tree_visit_children(struct top_prefix_tree* tree,struct top_prefix_tree_visit_data* stack,int size,struct top_prefix_tree_visit_ctx* ctx)
 {
-	int rlt = 1;
-	int pos;
-	unsigned long node;
-	struct top_prefix_tree_visit_data data;
-	struct top_prefix_tree_visit_data* current;
-	while(rlt && size && (current = &stack[--size])) {
-		data = *current;
-		if(data.slot_idx < tree->conf.key_map_size - 1) {
-			++current->pself;
-			++current->slot_idx;
-			++size;
-		}
-		node = *data.pself;	
-		if(node) {
-			pos = data.key_start;
-			if(data.slot_idx < tree->conf.key_map_size) {
-				top_prefix_tree_visit_ctx_append_suffix(ctx,&pos, tree->conf.key_map[data.slot_idx]);
-			}
-		if(PREFIX_TREE_NODE_IS_KEY(node)) {
-			rlt = top_prefix_tree_visit_key(tree,PREFIX_TREE_NODE_KEY(node),0,stack,&size,ctx,pos);
-		}else{
-			rlt = top_prefix_tree_visit_slots(tree,PREFIX_TREE_NODE_SLOTS(node),0,stack,&size,ctx,pos);
-		}
-		}
-	}
-	return rlt;
+    int rlt = 1;
+    int pos;
+    unsigned long node;
+    struct top_prefix_tree_visit_data data;
+    struct top_prefix_tree_visit_data* current;
+    while(rlt && size && (current = &stack[--size])) {
+        data = *current;
+        if(data.slot_idx < tree->conf.key_map_size - 1) {
+            ++current->pself;
+            ++current->slot_idx;
+            ++size;
+        }
+        node = *data.pself;
+        if(node) {
+            pos = data.key_start;
+            if(data.slot_idx < tree->conf.key_map_size) {
+                top_prefix_tree_visit_ctx_append_suffix(ctx,&pos, tree->conf.key_map[data.slot_idx]);
+            }
+            if(PREFIX_TREE_NODE_IS_KEY(node)) {
+                rlt = top_prefix_tree_visit_key(tree,PREFIX_TREE_NODE_KEY(node),0,stack,&size,ctx,pos);
+            } else {
+                rlt = top_prefix_tree_visit_slots(tree,PREFIX_TREE_NODE_SLOTS(node),0,stack,&size,ctx,pos);
+            }
+        }
+    }
+    return rlt;
 }
 
 static int top_prefix_tree_visit_key(struct top_prefix_tree* tree,struct top_prefix_tree_key* tree_key,int start,struct top_prefix_tree_visit_data* stack,int* size,struct top_prefix_tree_visit_ctx* ctx,int pos)
 {
-	const char* key = tree_key->key + start;
-	unsigned char c;
-	while(1) {
-		switch((c = *key++)) {
-		case PREFIX_TREE_NODE_KEY_EOF_KEY:
-			tree_key = tree_key->next;
-			assert(tree_key);
-			key = tree_key->key;
-			break;
-		case PREFIX_TREE_NODE_KEY_EOF_DATA:
-			return top_prefix_tree_visit_ctx_visit(ctx,tree_key->next,pos,tree);
-		case PREFIX_TREE_NODE_KEY_EOF:
-			return top_prefix_tree_visit_slots(tree,(struct top_prefix_tree_slots*)tree_key->next,0,stack,size,ctx,pos);
-		default:
-			top_prefix_tree_visit_ctx_append_suffix(ctx,&pos,c);
-			break;
-		}
-	}
+    const char* key = tree_key->key + start;
+    unsigned char c;
+    while(1) {
+        switch((c = *key++)) {
+        case PREFIX_TREE_NODE_KEY_EOF_KEY:
+            tree_key = tree_key->next;
+            assert(tree_key);
+            key = tree_key->key;
+            break;
+        case PREFIX_TREE_NODE_KEY_EOF_DATA:
+            return top_prefix_tree_visit_ctx_visit(ctx,tree_key->next,pos,tree);
+        case PREFIX_TREE_NODE_KEY_EOF:
+            return top_prefix_tree_visit_slots(tree,(struct top_prefix_tree_slots*)tree_key->next,0,stack,size,ctx,pos);
+        default:
+            top_prefix_tree_visit_ctx_append_suffix(ctx,&pos,c);
+            break;
+        }
+    }
 }
 
 static int top_prefix_tree_visit_slots(struct top_prefix_tree* tree,struct top_prefix_tree_slots* tree_slots,int start,struct top_prefix_tree_visit_data* stack,int* size,struct top_prefix_tree_visit_ctx* ctx,int pos)
 {
-	const char* key = tree_slots->key;
-	int i;
-	int rlt = 1;
-	for(i = start; i < PREFIX_TREE_NODE_SLOTS_KEY_SIZE && key[i]; ++i){
-		top_prefix_tree_visit_ctx_append_suffix(ctx,&pos,key[i]);
-	}
-	if(tree_slots->data) {
-			rlt = top_prefix_tree_visit_ctx_visit(ctx,tree_slots->data,pos,tree);
-	}
-	if(rlt && !top_prefix_tree_visit_stack_push(stack,size,&tree_slots->slots[0],pos,0)) {
-		for(i = 0; rlt && i < tree->conf.key_map_size; ++i) {
-			if(tree_slots->slots[i]) {
-				top_prefix_tree_visit_ctx_set_suffix(ctx,pos,tree->conf.key_map[i]);
-				rlt = top_prefix_tree_visit_node(tree,tree_slots->slots[i],ctx,pos + 1);
-			}
-		}
-	}
-	return rlt;
+    const char* key = tree_slots->key;
+    int i;
+    int rlt = 1;
+    for(i = start; i < PREFIX_TREE_NODE_SLOTS_KEY_SIZE && key[i]; ++i) {
+        top_prefix_tree_visit_ctx_append_suffix(ctx,&pos,key[i]);
+    }
+    if(tree_slots->data) {
+        rlt = top_prefix_tree_visit_ctx_visit(ctx,tree_slots->data,pos,tree);
+    }
+    if(rlt && !top_prefix_tree_visit_stack_push(stack,size,&tree_slots->slots[0],pos,0)) {
+        for(i = 0; rlt && i < tree->conf.key_map_size; ++i) {
+            if(tree_slots->slots[i]) {
+                top_prefix_tree_visit_ctx_set_suffix(ctx,pos,tree->conf.key_map[i]);
+                rlt = top_prefix_tree_visit_node(tree,tree_slots->slots[i],ctx,pos + 1);
+            }
+        }
+    }
+    return rlt;
 }
 
 int top_prefix_tree_simple_visit(struct top_prefix_tree* tree, const char* key,struct top_prefix_tree_visit_ctx* ctx)
 {
-	if(key == 0) key = "";
-	struct top_prefix_tree_key_vec key_vec = { key, 0};
-	return top_prefix_tree_visit(tree,&key_vec,1,ctx);
+    if(key == 0) key = "";
+    struct top_prefix_tree_key_vec key_vec = { key, 0};
+    return top_prefix_tree_visit(tree,&key_vec,1,ctx);
 }
 
 int top_prefix_tree_visit(struct top_prefix_tree* tree, const struct top_prefix_tree_key_vec* key_vec,int count,struct top_prefix_tree_visit_ctx* ctx)
 {
-	struct top_prefix_tree_ctx match_ctx;
-	top_prefix_tree_ctx_init(&match_ctx,tree,key_vec,count);
-	(void)top_prefix_tree_ctx_find(&match_ctx);
-	switch(match_ctx.rlt) {
-	case MATCH_ALL:
-		if(match_ctx.slots) {
-			return top_prefix_tree_visit_node(tree,(unsigned long)match_ctx.slots,ctx,0);
-		}else {
-			return top_prefix_tree_visit_ctx_visit(ctx,match_ctx.current->next,0,tree);
-		}
-		break;
-	case MATCH_PREFIX:
-		top_prefix_tree_visit_match_continue(ctx,&match_ctx);
-		break;
-	default:
-		return;
-	}
-	return 1;
+    struct top_prefix_tree_ctx match_ctx;
+    top_prefix_tree_ctx_init(&match_ctx,tree,key_vec,count);
+    (void)top_prefix_tree_ctx_find(&match_ctx);
+    switch(match_ctx.rlt) {
+    case MATCH_ALL:
+        if(match_ctx.slots) {
+            return top_prefix_tree_visit_node(tree,(unsigned long)match_ctx.slots,ctx,0);
+        } else {
+            return top_prefix_tree_visit_ctx_visit(ctx,match_ctx.current->next,0,tree);
+        }
+        break;
+    case MATCH_PREFIX:
+        top_prefix_tree_visit_match_continue(ctx,&match_ctx);
+        break;
+    default:
+        return;
+    }
+    return 1;
 }
 

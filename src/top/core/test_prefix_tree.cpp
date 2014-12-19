@@ -224,6 +224,11 @@ public:
 		ctx.user_data = &counter;
 		top_prefix_tree_simple_visit(&tree,"https",&ctx);
 		cout << endl << "-- visit ,total count = " << counter.count << ", Total Len: " << counter.len  << ", keycount: " << keys_cnt << endl;
+		counter.count = counter.len = 0;
+		top_prefix_tree_simple_visit(&tree,"hallo",&ctx);
+		CPPUNIT_ASSERT_EQUAL(counter.count,0);
+		top_prefix_tree_simple_visit(&tree,0,&ctx);
+		CPPUNIT_ASSERT_EQUAL(counter.count,keys_cnt);
         for(int i = 0; i < keys_cnt; ++i) {
             void* found = top_prefix_tree_simple_find(&tree,keys[i]);
             CPPUNIT_ASSERT_EQUAL(found,(void*)keys[i]);

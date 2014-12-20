@@ -16,7 +16,7 @@ if CHECK_TEST
 TESTS = coretestmain
 check_PROGRAMS = $(TESTS)
 
-coretestmain_SOURCES1 = test_main.cpp \
+coretestmain_SOURCES = test_main.cpp \
 			test_timer.hpp \
 		       test_heap.cpp \
 			test_rbtree.cpp \
@@ -25,9 +25,11 @@ coretestmain_SOURCES1 = test_main.cpp \
 			test_list.cpp \
 			test_hlist.cpp \
 			test_radix_tree.cpp  \
-			test_base64.cpp
+			test_base64.cpp \
+			test_prefix_tree.cpp \
+			test_stack.cpp
 
-coretestmain_SOURCES = test_main.cpp \
+coretestmain_SOURCES1 = test_main.cpp \
 			test_prefix_tree.cpp 
 
 coretestmain_LDFLAGS = @CPPUNIT_LDFLAGS@ $(top_builddir)/src/top/core/libtop_core.la

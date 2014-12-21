@@ -33,6 +33,11 @@ typedef struct top_mem_pool {
 } top_mem_pool_t;
 
 
+top_error_t top_pool_malloc(struct top_pool* pool,unsigned long size,void** pallocated);
+top_error_t top_pool_calloc(struct top_pool* pool,unsigned long size,void** pallocated);
+top_error_t top_pool_memalign(struct top_pool* pool,unsigned long alignment,unsigned long size,void** pallocated);
+void top_pool_free(struct top_pool* pool,void* p);
+
 
 #ifdef __cplusplus
 }

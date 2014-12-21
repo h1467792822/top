@@ -87,6 +87,22 @@ static inline void top_hlist_move(struct top_hlist* old,struct top_hlist* dest)
 	old->first = 0;
 }
 
+static inline void top_hlist_node_move(struct top_hlist_node* node,struct top_hlist* dest) 
+{
+	top_hlist_node_del(node);
+	top_hlist_add_head(dest,node);
+}
+
+static inline struct top_hlist_node* top_hlist_remove_first(struct top_hlist* list)
+{
+	if(!top_hlist_empty(list)) {
+		struct top_hlist_node* node = list->first;
+		top_hlist_node_del(node);
+		return node;
+	}
+	return 0;
+}
+
 #define top_hlist_for_each(head,pos) \
 	for((pos) = (head)->first; (pos); (pos) = (pos)->next)
 
@@ -106,7 +122,7 @@ static inline void top_hlist_move(struct top_hlist* old,struct top_hlist* dest)
 	for((tmp) = (entry)->member.next; (tmp) && ((entry) = top_hlist_entry(tmp,typeof(*(entry)),member),1); (tmp) = (tmp)->next)
 
 #define top_hlist_for_each_entry_safe(head,entry,member,tmp1,tmp2) \
-	for((tmp1) = head->first; (tmp1) && ((entry) = top_hlist_entry((tmp1),typeof(*(entry)),member),(tmp2) = (tmp1)->next,1); (tmp1) = (tmp2))
+	for((tmp1) = (head)->first; (tmp1) && ((entry) = top_hlist_entry((tmp1),typeof(*(entry)),member),(tmp2) = (tmp1)->next,1); (tmp1) = (tmp2))
 
 #define top_hlist_for_each_entry_safe_continue(entry,member,tmp1,tmp2) \
 	for((tmp1) = (entry)->member.next; (tmp1) && ((entry) = top_hlist_entry((tmp1),typeof(*(entry)),member),(tmp2) = (tmp1)->next,1); (tmp1) = (tmp2))

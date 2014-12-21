@@ -104,6 +104,28 @@ static inline int top_list_singular(struct top_list* list) {
 	return !top_list_empty(list) && list->first == list->last;
 }
 
+static inline struct top_list_node* top_list_remove_first(struct top_list* list)
+{
+	if(!top_list_empty(list)) {
+		struct top_list_node* node = list->first;
+		top_list_node_del(node);
+		return node;
+	}
+	return 0;
+}
+
+static inline struct top_list_node* top_list_remove_last(struct top_list* list)
+{
+	if(!top_list_empty(list)) {
+		struct top_list_node* node = list->last;
+		top_list_node_del(node);
+		return node;
+	}
+	return 0;
+}
+
+
+
 #define top_list_for_each(list,node) \
 	for( (node) = (list)->first; (node) != (struct top_list_node*)(list); (node) = (node)->next)
 

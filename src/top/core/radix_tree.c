@@ -1,5 +1,6 @@
 
 #include <top/core/radix_tree.h>
+#include <top/core/alloc.h>
 #include <stdlib.h> //for malloc/free
 #include <string.h> //for memset
 #include <stdio.h>
@@ -29,28 +30,6 @@ struct top_radix_tree_node {
 #define RADIX_TREE_PAGE_SIZE (4 * 1024)
 #define RADIX_TREE_NODE_COUNT_PER_PAGE (RADIX_TREE_PAGE_SIZE / sizeof(struct top_radix_tree_node) )
 
-static top_error_t top_radix_tree_def_malloc(void* data,unsigned long size,void** palloc)
-{
-    void* alloc = malloc(size);
-    if(alloc) {
-        *palloc = alloc;
-        return TOP_OK;
-    }
-    return TOP_ERROR(-1);
-}
-
-static void top_radix_tree_def_free(void* data, void* alloc,unsigned long size)
-{
-    free(alloc);
-}
-
-static const struct top_radix_tree_conf g_def_conf = {
-    .pfmalloc = top_radix_tree_def_malloc,
-    .pffree = top_radix_tree_def_free,
-    .max_capacity = (unsigned long)-1,
-};
-
-
 static top_error_t top_radix_tree_alloc_node(struct top_radix_tree* tree,struct top_radix_tree_node** pnode)
 {
     struct top_radix_tree_node* node;
@@ -69,7 +48,7 @@ static top_error_t top_radix_tree_alloc_node(struct top_radix_tree* tree,struct 
         return TOP_OK;
     }
     if(tree->conf.max_capacity - RADIX_TREE_PAGE_SIZE > tree->capacity) {
-        top_error_t err = tree->conf.pfmalloc(tree->conf.user_data,RADIX_TREE_PAGE_SIZE,(void**)&node);
+        top_error_t err = top_malloc(tree->conf.alloc,RADIX_TREE_PAGE_SIZE,(void**)&node);
         if(top_errno(err))
             return err;
         tree->capacity += RADIX_TREE_PAGE_SIZE;
@@ -95,13 +74,9 @@ void top_radix_tree_init(struct top_radix_tree* tree, const struct top_radix_tre
     memset(tree,0,sizeof(*tree));
     if(conf) {
         tree->conf = *conf;
-        if(tree->conf.pfmalloc == 0 || tree->conf.pffree == 0) {
-            tree->conf.pfmalloc = g_def_conf.pfmalloc;
-            tree->conf.pffree = g_def_conf.pffree;
-        }
-    } else {
-        tree->conf = g_def_conf;
     }
+    if(tree->conf.alloc == 0) tree->conf.alloc = g_top_glibc_alloc;
+    if(tree->conf.max_capacity == 0) tree->conf.max_capacity = (unsigned long)-1;
 }
 
 void top_radix_tree_fini(struct top_radix_tree* tree)
@@ -109,7 +84,7 @@ void top_radix_tree_fini(struct top_radix_tree* tree)
     struct top_radix_tree_node* next;
     struct top_radix_tree_node* pos = tree->bulk_alloc;
     for(; pos && (next = pos->next, 1); pos = next) {
-        tree->conf.pffree(tree->conf.user_data,pos,RADIX_TREE_PAGE_SIZE);
+        top_free(tree->conf.alloc,pos);
     }
     //memset(tree,0,sizeof(*tree));
 }

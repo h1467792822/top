@@ -22,12 +22,10 @@
 extern "C" {
 #endif
 
+struct top_alloc;
 struct top_pool_conf
 {
-	top_error_t (*malloc)(void* user_data,unsigned long size,void** ppage);
-	top_error_t (*memalign)(void* user_data,unsigned long alignment,unsigned long size,void** ppage);
-	void (*free)(void* user_data,void* page);
-	void* user_data;
+	struct top_alloc* alloc;
 	unsigned long max_capacity;
 	unsigned int page_size; 
 };
@@ -45,7 +43,7 @@ struct top_pool
 	unsigned long free_count;
 	unsigned long large_alloc_count;
 	unsigned long large_free_count;
-	const struct top_pool_conf* conf;
+	struct top_pool_conf conf;
 };
 
 void top_pool_init(struct top_pool* pool,const struct top_pool_conf* conf);

@@ -1,5 +1,6 @@
 
 #include <top/core/prefix_tree.h>
+#include <top/core/alloc.h>
 #include <stdlib.h> //for malloc/free
 #include <string.h> //for memset
 #include <stdio.h>
@@ -242,7 +243,7 @@ static inline void top_prefix_tree_free_bulk(struct top_prefix_tree* tree)
     while(tree->bulk_alloc) {
         slots = tree->bulk_alloc;
         tree->bulk_alloc = slots->bulk_next;
-        tree->conf.pffree(tree->conf.user_data,slots,slots->bulk_size);
+        top_free(tree->conf.alloc,slots);
     }
 }
 
@@ -278,7 +279,7 @@ static inline top_error_t top_prefix_tree_alloc_slots(struct top_prefix_tree* tr
     if(avail_num < 2) return TOP_ERROR(-1);
     top_error_t err;
     struct top_prefix_tree_slots* slots;
-    err = tree->conf.pfmalloc(tree->conf.user_data,bulk_size,(void**)&slots);
+    err = top_malloc(tree->conf.alloc,bulk_size,(void**)&slots);
     if(top_errno(err)) return err;
 
     tree->capacity += bulk_size;
@@ -879,21 +880,6 @@ top_error_t top_prefix_tree_simple_insert(struct top_prefix_tree* tree,const cha
     return top_prefix_tree_ctx_insert(&ctx,data,pold_data);
 }
 
-static top_error_t top_prefix_tree_malloc(void* data, unsigned long size,void** pallocated)
-{
-    void* p = malloc(size);
-    if(p) {
-        *pallocated = p;
-        return TOP_OK;
-    }
-    return TOP_ERROR(-1);
-}
-
-static void top_prefix_tree_free(void* data,void* allocated,unsigned long size)
-{
-    free(allocated);
-}
-
 void top_prefix_tree_init(struct top_prefix_tree* tree,const struct top_prefix_tree_conf* conf)
 {
     struct top_prefix_tree_conf* tree_conf;
@@ -903,9 +889,8 @@ void top_prefix_tree_init(struct top_prefix_tree* tree,const struct top_prefix_t
     if(conf) {
         *tree_conf = *conf;
     }
-    if(tree_conf->pfmalloc == 0 ||tree_conf->pffree == 0) {
-        tree_conf->pfmalloc = top_prefix_tree_malloc;
-        tree_conf->pffree = top_prefix_tree_free;
+    if(tree_conf->alloc == 0) {
+        tree_conf->alloc = g_top_glibc_alloc;
     }
     if(tree_conf->key_map == 0 || tree_conf->slot_map == 0 || tree_conf->key_map_size == 0) {
         tree_conf->key_map = g_prefix_tree_key_map;
@@ -1163,7 +1148,7 @@ static int top_prefix_tree_visit_children(struct top_prefix_tree* tree,struct to
     struct top_prefix_tree_visit_data data;
     struct top_prefix_tree_visit_data* current;
     while(rlt && size ) {
-		current = &stack[--size];
+        current = &stack[--size];
         data = *current;
         if(data.slot_idx < tree->conf.key_map_size - 1) {
             ++current->pself;

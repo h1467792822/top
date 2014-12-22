@@ -18,11 +18,10 @@
 extern "C" {
 #endif
 
+struct top_alloc;
 struct top_bcache_conf
 {
-	top_error_t (*alloc_page)(void* user_data,unsigned long size,void** ppage);
-	void (*free_page)(void* user_data,void* page,unsigned long size);
-	void* user_data;
+	struct top_alloc *alloc;
 	unsigned long max_capacity;
 	unsigned long page_size;
 	unsigned short block_size;
@@ -42,7 +41,7 @@ struct top_bcache
 	struct top_bcache_conf conf;
 };
 
-void top_bcache_init(struct top_bcache* cache,struct top_bcache_conf* conf);
+void top_bcache_init(struct top_bcache* cache,const struct top_bcache_conf* conf);
 
 void top_bcache_fini(struct top_bcache* cache);
 

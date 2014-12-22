@@ -10,14 +10,31 @@
 extern "C" {
 #endif
 
+struct top_alloc {
+		top_error_t (*malloc)(struct top_alloc* self,unsigned long size,void** palloc);
+		top_error_t (*calloc)(struct top_alloc* self,unsigned long size,void** palloc);
+		top_error_t (*memalign)(struct top_alloc* self,unsigned long alignment,unsigned long size,void** palloc);
+		void (*free)(struct top_alloc* self,void* p);
+	};
+	
+extern struct top_alloc* g_top_glibc_alloc;
 
-	top_error_t top_glibc_malloc(void* user_data,unsigned long size,void** palloc);
+	static inline top_error_t top_malloc(struct top_alloc* self,unsigned long size,void** palloc) {
+		return self->malloc(self,size,palloc);
+	}
 
-	top_error_t top_glibc_calloc(void* user_data,unsigned long size,void** palloc);
+	static inline top_error_t top_calloc(struct top_alloc* self,unsigned long size,void** palloc) {
+		return self->calloc(self,size,palloc);
+	}
 
-	top_error_t top_glibc_memalign(void* user_data,unsigned long alignment,unsigned long size,void** palloc);
+	static inline top_error_t top_memalign(struct top_alloc* self,unsigned long alignment,unsigned long size,void** palloc) {
+		return self->memalign(self,alignment,size,palloc);
+	}
 
-	void top_glibc_free(void* user_data,void* p);
+	static inline void top_free(struct top_alloc* self,void* p) {
+		return self->free(self,p);
+	}
+
 
 #ifdef __cplusplus
 }

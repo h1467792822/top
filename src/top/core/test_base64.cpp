@@ -103,7 +103,6 @@ public:
 	{
 		const char* encoded = "09524A673C067403120EB9935C6EB6F8=";
 		int decode_size = top_base64_decoded_size(strlen(encoded));
-		printf("\ne_size: %d,d_size: %d\n",strlen(encoded),decode_size);
 		char decode[decode_size];
 		char* decode_buf = decode;
         top_base64_ctx ctx;

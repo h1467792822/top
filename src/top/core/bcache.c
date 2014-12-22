@@ -134,7 +134,6 @@ void top_bcache_free_cached(struct top_bcache* cache)
     struct top_bcache_page* page;
     struct top_hlist_node* tmp1,*tmp2;
     top_hlist_for_each_entry_safe(&cache->full_cached,page,cached,tmp1,tmp2) {
-		printf("\npage->block_count: %ul, max_count: %ul\n",page->block_count,cache->block_count_per_page);
             top_hlist_node_del(&page->cached);
             cache->conf.free_page(cache->conf.user_data,page,cache->conf.page_size);
             cache->capacity -= cache->conf.page_size;

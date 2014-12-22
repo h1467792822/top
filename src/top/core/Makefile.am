@@ -10,14 +10,16 @@ libtop_core_la_SOURCES = \
 	linux_rbtree.c \
 	radix_tree.c  \
 	prefix_tree.c \
-	bcache.c
+	bcache.c \
+	alloc.c \
+	pool.c
 
 if CHECK_TEST
 
 TESTS = coretestmain
 check_PROGRAMS = $(TESTS)
 
-coretestmain_SOURCES1 = test_main.cpp \
+coretestmain_SOURCES = test_main.cpp \
 			test_timer.hpp \
 		       test_heap.cpp \
 			test_rbtree.cpp \
@@ -28,10 +30,12 @@ coretestmain_SOURCES1 = test_main.cpp \
 			test_radix_tree.cpp  \
 			test_base64.cpp \
 			test_prefix_tree.cpp \
-			test_stack.cpp
-
-coretestmain_SOURCES = test_main.cpp \
+			test_stack.cpp \
+			test_pool.cpp \
 			test_bcache.cpp 
+
+coretestmain_SOURCES1 = test_main.cpp \
+			test_pool.cpp 
 
 coretestmain_LDFLAGS = @CPPUNIT_LDFLAGS@ $(top_builddir)/src/top/core/libtop_core.la
 

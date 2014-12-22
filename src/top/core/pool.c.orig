@@ -1,0 +1,196 @@
+
+#include <top/core/pool.h>
+#include <top/core/rbtree.h>
+#include <assert.h>
+#include <stdio.h>
+#include <stdlib.h>
+
+struct top_pool_page{
+	struct top_hlist_node node;
+	unsigned short avail_size;
+	unsigned short alloc_count;
+	unsigned char fail_count;
+};
+
+
+struct top_pool_large{
+	struct top_rbtree_node node;
+	void* alloc;
+};
+
+#define TOP_POOL_PAGE_MAX_FAIL_COUNT 4
+#define TOP_POOL_PAGE_MAX_AVAIL_SIZE(pool) ((pool)->conf.page_size - sizeof(struct top_pool_large))
+#define TOP_POOL_ALIGN_SIZE( size ) (((size) + sizeof(void*) - 1) & ~(sizeof(void*) - 1))
+
+static inline void top_pool_free_small(struct top_pool* pool,void* p)
+{
+	struct top_pool_page* page = (struct top_pool_page*)*((void**)p - 1);
+	if(0 == --page->alloc_count){
+		page->avail_size = TOP_POOL_PAGE_MAX_AVAIL_SIZE(pool);
+		page->fail_count = 0;
+		top_list_node_move_tail(&page->node,pool->pages);
+		if(&pool->current->node == (struct top_list_node*)&pool->pages) {
+			pool->current = page;
+		}
+	}
+}
+
+static inline top_error_t top_pool_alloc_low(struct top_pool* pool,unsigned long size,void** pp)
+{
+	return pool->conf.malloc(pool->conf.user_data,size,pp);
+}
+
+static inline void top_pool_free_low(struct top_pool* pool,void* p)
+{
+	pool->conf.free(pool->conf.user_data,p);
+}
+
+tree_node* tree_find(struct top_rbtree* tree,tree_node* node)
+{
+	    struct top_rbtree_node* parent = tree->root;
+		    struct tree_node* tnode;
+			    while(parent) {
+					        tnode = top_rb_entry(parent,tree_node,node);
+							        if(tnode->value == node->value) {
+										            return tnode;
+													        }
+									        if(tnode->value > node->value)
+												            parent = parent->left;
+											        else
+														            parent = parent->right;
+													    }
+				    return 0;
+}
+
+tree_node* tree_insert(struct top_rbtree* tree,tree_node* node)
+{
+	    struct top_rbtree_node** p = &tree->root;
+		    struct top_rbtree_node* parent = *p;
+			    struct tree_node* tnode;
+				    while(*p) {
+						        parent = *p;
+								        tnode = top_container_of(parent,tree_node,node);
+										        if(tnode->value > node->value) {
+													            p = &parent->left;
+																        } else if(tnode->value < node->value) {
+																			            p = &parent->right;
+																						        } else {
+																									            return tnode;
+																												        }
+												    }
+					    top_rbtree_link_node(tree,&node->node,parent,p);
+						    return node;
+}
+static inline struct top_pool_large* top_pool_find_large(struct top_pool* pool, void* p)
+{
+	struct top_pool_large* page;
+	struct top_rbtree_node* 
+}
+
+void top_pool_free(struct top_pool* pool,void* p)
+{
+	struct top_pool_large* large = top_pool_find_large(pool,p);
+	if(large) {
+		top_pool_free_low(pool,large->alloc);
+		top_pool_free_small(pool,large);
+	}else {
+		top_pool_free_small(pool,p);	
+	}
+}
+
+top_error_t top_pool_alloc_small(struct top_pool* pool,unsigned long size,void** pp)
+{
+	struct top_pool_page* page = current;
+	void** ppage;
+	size = TOP_POOL_ALIGN_SIZE(size + sizeof(void*));
+	top_list_for_each_entry_from(&pool->pages,page,node) {
+		if(page->avail_size >= size) {
+			ppage = (void**)((char*)page + pool->conf.page_size - page->avail_size);
+			*ppage = page;
+			*pp = ppage + 1;
+			page->avail_size -= size;
+			++page->alloc_count;
+			return TOP_OK;
+		}else {
+			++page->fail_count;
+			if(page->fail_count == TOP_POOL_PAGE_MAX_FAIL_COUNT) {
+				current = top_list_entry(page->node.next,struct top_pool_page,node);
+			}
+		}
+	}
+
+	top_error_t err;
+	err = top_pool_alloc_low(pool,pool->conf.page_size, (void**)&page);
+	if(top_errno(err)) return err;
+
+	page->fail_count = 0;
+	page->avail_size = TOP_POOL_PAGE_MAX_AVAIL_SIZE(pool) - size;
+	page->alloc_count = 1;
+	ppage = (void**)(page + 1);
+	*ppage = page;	
+	**pp = ppage + 1;	
+
+	top_list_add_tail(&pool->pages,&page->node);
+	if(&current->node == (struct top_list_node*)&pool->pages) {
+		current = page;
+	}
+	return TOP_OK;
+}
+
+top_error_t top_pool_alloc_add_large(struct top_pool* pool,void* data) {
+	struct top_pool_large* large;
+	err = top_pool_alloc_small(pool,sizeof(*large),(void**)&large);
+	if(top_errno(err)) {
+		top_pool_free_low(pool,data);
+		return err;
+	}
+
+	large->alloc = data;
+	top_pool_large_insert(pool,large);
+	*pp = alloc;
+	return TOP_OK;
+}
+
+top_error_t top_pool_alloc_large(struct top_pool* pool,unsigned long size,void ** pp)
+{
+	top_error_t err;
+	void* alloc;
+	err = top_pool_alloc_low(pool,size,&alloc);
+	if(top_errno(err)) return err;
+
+	return top_pool_alloc_add_large(pool,alloc);
+}
+
+top_error_t top_pool_alloc(struct top_pool* pool,unsigned long size,void ** pp)
+{
+	if(size > pool->conf.max_alloc_size) {
+		return top_pool_alloc_large(pool,size,pp);
+	}else {
+		return top_pool_alloc_small(pool,size,pp);
+	}
+}
+
+top_error_t top_pool_calloc(struct top_pool* pool,unsigned long size,void** pp)
+{
+	top_error_t err;
+	if(size > pool->conf.max_alloc_size) {
+		err = top_pool_alloc_large(pool,size,pp);
+	}else {
+		err = top_pool_alloc_small(pool,size,pp);
+	}
+	if(top_errno(err) == 0){
+		memset(*pp,0,size);
+	}
+	return err;
+}
+
+top_error_t top_pool_memalign(struct top_pool* pool,unsigned long alignment,unsigned long size,void** pp)
+{
+	top_error_t err;
+	void* alloc;
+	err = pool->conf.memalign(pool->conf.user_data,alignment,size,pp);
+	if(top_errno(err)) return err;
+	
+	return top_pool_alloc_add_large(pool,alloc);
+}
+

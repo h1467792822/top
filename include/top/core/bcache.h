@@ -10,7 +10,7 @@
 #include <top/core/stack.h>
 #endif
 
-#ifndef TOP_CORE_LIST_H
+#ifndef TOP_CORE_HLIST_H
 #include <top/core/hlist.h>
 #endif
 

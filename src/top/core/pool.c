@@ -213,12 +213,16 @@ top_error_t top_pool_calloc(struct top_pool* pool,unsigned long size,void** pp)
 
 top_error_t top_pool_memalign(struct top_pool* pool,unsigned long alignment,unsigned long size,void** pp)
 {
-    top_error_t err;
-    void* alloc;
-    err = pool->conf->memalign(pool->conf->user_data,alignment,size,pp);
-    if(top_errno(err)) return err;
+    if(alignment <= sizeof(void*)) {
+        return top_pool_malloc(pool,size,pp);
+    } else {
+        top_error_t err;
+        void* alloc;
+        err = pool->conf->memalign(pool->conf->user_data,alignment,size,pp);
+        if(top_errno(err)) return err;
 
-    return top_pool_alloc_add_large(pool,alloc,size,pp);
+        return top_pool_alloc_add_large(pool,alloc,size,pp);
+    }
 }
 
 void top_pool_free_cached(struct top_pool* pool)

@@ -22,9 +22,16 @@ static void* top_idle_main(struct top_task_s* task, void* data) {
 
 static void* top_sched_main(void* data) 
 {
-	pthread_sigmask(...);
-	sigaction(
-	top_schedule((struct top_sched_s*)data);
+	struct top_sched_s* sch = (struct top_sched_s*)data;
+	struct sigaction sa;
+	memset(&sa,0,sizeof(sa));
+	sa.sa_action = top_sig_action;
+	sa.sa_flags = SA_SIGINFO;
+	if(0 == sigaction(TOP_SIG_AWAKE,&sa,0)) {
+		top_schedule(sch);
+	}else {
+		sch->retval = 1;
+	}
 	return 0;
 }
 
@@ -36,14 +43,25 @@ top_error_t top_sched_init(struct top_sched_s* sch,const struct top_pthread_conf
 	top_list_init(&sch->sleeping);
 	top_task_init(&sch->idle,top_idle_main,sch);
 	sch->idle.next = sch->idle.prev = &sch->idle;
+	sch->retval = 0;
 	return conf->create(&sch->tid,conf->user_data,top_sched_main,sch,0,0);
 }
 
+/**
+ * only invoked by sched-manager
+ */
 void top_sched_join(struct top_sched_s* sch,void* data)
 {
+	struct top_sched_s* current = g_current_sched;
+	if(current == 0) {
+		sch->conf->join(sch->tid);
+		return;
+	}else if(current != sch) {
+
+	}
 }
 
-static inline void top_task_run(struct top_task_s* task) 
+static inline void top_task_main(struct top_task_s* task) 
 {
 	task->sch->current = task;
 	void* retval = task->main(task,task->main_data);
@@ -65,7 +83,7 @@ void top_schedule(struct top_sched_s* sch)
 	}
 	sch->current = task;
 	switch(task->state) {
-	case TOP_TASK_INIT:
+	case TOP_TASK_ST_INIT:
 		top_task_main(task);
 		break;
 	default:
@@ -82,12 +100,21 @@ void top_task_init(struct top_task_s* task,top_task_main main,void* main_data) {
 }
 
 top_error_t top_task_attach(struct top_task_s* task,struct top_sched_s* sch) {
-	switch(task->state) {
-		case 0:
-			return top_pthread_kill(sch->tid,task);
-		default:
-			return TOP_ERROR(-1);
+	if(task->state == TOP_TASK_ST_INIT) {
+	if(sch == g_current_sched) {
+		top_list_add_tail(&sch->running,&task->to_sch);
+		++sch->running_count;
+		return TOP_OK;
+	}else {
+		return top_pthread_rt_signal(sch->conf,sch->tid,TOP_SIG_AWAKE,task);
 	}
+	}
+	return TOP_ERROR(-1);
 }
 
+void top_task_yield(struct top_task_s* task) {
+	assert(task->sched == g_current_sched);
+	top_list_add_tail(&task->sched->running,&task->to_sch);
+	TOP_TASK_SWITCH_CONTEXT(task);
+}
 

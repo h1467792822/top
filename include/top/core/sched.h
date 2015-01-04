@@ -13,13 +13,13 @@ extern "C" {
 typedef void* (*top_task_main)(struct top_task_s* task,void* main_data);
 
 typedef enum top_task_state_enum {
-	TOP_TASK_INIT = 0,
-	TOP_TASK_PENDING,
-	TOP_TASK_RUNNING,
-	TOP_TASK_COND_WAIT,
-	TOP_TASK_LOCK_WAIT,
-	TOP_TASK_SLEEP,
-	TOP_TASK_EXIT,
+	TOP_TASK_ST_INIT = 0,
+	TOP_TASK_ST_PENDING,
+	TOP_TASK_ST_RUNNING,
+	TOP_TASK_ST_COND_WAIT,
+	TOP_TASK_ST_LOCK_WAIT,
+	TOP_TASK_ST_SLEEP,
+	TOP_TASK_ST_EXIT,
 }top_task_state_e;
 
 typedef struct top_task_s {
@@ -49,6 +49,7 @@ typedef struct top_sched_s {
 	top_pthread_t tid;
 	struct top_task_s* current;
 	const struct top_pthread_conf_s* conf;
+	int retval;
 }top_sched_t;
 
 struct top_sched_s* top_current_sched();
@@ -61,6 +62,12 @@ top_error_t top_sched_init(struct top_sched_s* sch,const struct top_pthread_conf
 void top_sched_join(struct top_sched_s* sch,struct top_sched_stat_s* stat);
 
 
+#define TOP_TASK_SWITCH_CONTEXT(task) \
+	do { \
+	if(0 == top_setjmp(&task->context)) { \
+		top_schedule(task->sched); \
+	}\
+	}while(0)
 
 #ifdef __cplusplus
 }

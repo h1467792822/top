@@ -1,189 +1,340 @@
 
-#include <top/core/sched.h>
 #include <pthread.h>
 #include <sys/select.h>
+#include <signal.h>
+#include <errno.h>
+#include <string.h>
+#include <semaphore.h>
+#include <assert.h>
+#include <stdio.h>
+#include <top/core/sched.h>
+#include <top/core/pthread.h>
+#include <top/core/atomic.h>
 
 typedef struct top_join_cond_s {
-	pthread_mutex_t mutex;
-	pthread_cond_t cond;
-}top_join_cond_t;
+    pthread_mutex_t mutex;
+    pthread_cond_t cond;
+} top_join_cond_t;
 
 static inline void top_join_cond_init(top_join_cond_t* cond)
 {
-	pthread_mutex_init(&cond->mutex,0);
-	pthread_cond_init(&cond->cond,0);
+    pthread_mutex_init(&cond->mutex,0);
+    pthread_cond_init(&cond->cond,0);
 }
 
 static inline void top_join_cond_fini(top_join_cond_t* cond)
 {
-	pthread_mutex_destroy(&cond->mutex);
-	pthread_cond_destroy(&cond->cond);
+    pthread_mutex_destroy(&cond->mutex);
+    pthread_cond_destroy(&cond->cond);
 }
 
-static inline void top_join_cond_signal(top_join_cond_t* cond)
-{
-	pthread_mutex_lock(&cond->mutex);
-	pthread_cond_signal(&cond->cond);
-	pthread_mutex_unlock(&cond->mutex);
-}
+#define TOP_JOIN_COND_WAIT( join_cond, express ) \
+	do { \
+		pthread_mutex_lock(&(join_cond)->mutex); \
+		if ( express ) pthread_cond_wait(&(join_cond)->cond,&(join_cond)->mutex); \
+		pthread_mutex_unlock(&(join_cond)->mutex); \
+	}while(0)
 
-#define TOP_SIG_AWAKE (SIGRTMIN) //只有一个信号，将task挂接到running队列中去
+#define TOP_JOIN_COND_SIGNAL( join_cond,express) \
+	do { \
+		pthread_mutex_lock(&(join_cond)->mutex); \
+		express; \
+		pthread_cond_signal(&(join_cond)->cond); \
+		pthread_mutex_unlock(&(join_cond)->mutex); \
+	}while(0)
+
+#define TOP_SIG_ATTACH (SIGRTMIN) //将task挂接到running队列中去
+#define TOP_SIG_RESUME (SIGRTMIN + 1) //将task挂接到running队列中去
+#define TOP_SIG_EXIT (SIGRTMIN + 2) //通知退出
 
 static __thread struct top_sched_s* g_current_sched = 0;
 
-void top_schedule(struct top_sched_s* sch) ;
+top_sched_t* top_current_sched()
+{
+    return g_current_sched;
+}
+
+top_task_t* top_current_task()
+{
+    top_sched_t* sched = g_current_sched;
+    return sched ? sched->current : 0;
+}
+
+void top_schedule(struct top_sched_s* sched) ;
 
 static void top_sig_action(int signo,siginfo_t* info,void* ucontext)
 {
-	struct top_task_s* task = info->si_value.sival_ptr;
-	task->flag |= TOP_TASK_FL_PENDING;
-	assert(task->sched == g_current_sched);
-	switch(task->state){
-		case TOP_TASK_ST_LOCK_WAIT:
-		case TOP_TASK_ST_COND_WAIT:
-		case TOP_TASK_ST_SLEEP:
-	top_list_add_tail(&task->sched->imm_running,&task->node);
-	break;
-		default:
-	top_list_add_tail(&task->sched->running,&task->node);
-	break;
-	}
-	++task->sched->running_count;
+    struct top_task_s* task = info->si_value.sival_ptr;
+    //task->flags |= TOP_TASK_FL_PENDING;
+    assert(task->sched == g_current_sched);
+    switch(task->state) {
+    case TOP_TASK_ST_LOCK_WAIT:
+    case TOP_TASK_ST_COND_WAIT:
+    case TOP_TASK_ST_SLEEP:
+        top_list_node_insert(&task->node,task->sched->imm_pos->next);
+        task->sched->imm_pos = &task->node;
+        break;
+    default:
+        top_list_add_tail(&task->sched->running,&task->node);
+        break;
+    }
 }
 
-static void* top_idle_main(struct top_task_s* task, void* data) {
-	select(0,0,0,0,0);
-	return data;
-}
-
-static void* top_sched_main(void* data) 
+static void* top_idle_main_loop(struct top_task_s* task, void* data)
 {
-	struct top_sched_s* sch = (struct top_sched_s*)data;
-	struct sigaction sa;
-	memset(&sa,0,sizeof(sa));
-	sa.sa_action = top_sig_action;
-	sa.sa_flags = SA_SIGINFO;
-	if(0 == sigaction(TOP_SIG_AWAKE,&sa,0)) {
-		top_schedule(sch);
-	}else {
-		sch->retval = 1;
-	}
-	return 0;
+    top_sched_t * sched = task->sched;
+    struct timeval tm = { 0, 1000 };
+    while(sched->terminated == 0) {
+        select(0,0,0,0,&tm);
+        TOP_TASK_SUSPEND(task);
+    }
+    ++sched->terminated;
+    top_longjmp(sched->context,1);
+    return 0;
 }
 
-top_error_t top_sched_init(struct top_sched_s* sch,const struct top_pthread_conf_s* conf)
+static void top_sig_ignore(int signo)
 {
-	sch->conf = conf;
-	top_list_init(&sch->imm_running);
-	top_list_init(&sch->running);
-	top_list_init(&sch->waiting);
-	top_list_init(&sch->sleeping);
-	top_task_init(&sch->idle,top_idle_main,sch);
-	sch->idle.next = sch->idle.prev = &sch->idle.node;
-	sch->retval = 0;
-	return conf->create(&sch->tid,conf->user_data,top_sched_main,sch,0,0);
+    (void)signo;
+}
+
+void top_sched_main_loop(top_sched_t* sched)
+{
+    g_current_sched = sched;
+    struct sigaction sa;
+    memset(&sa,0,sizeof(sa));
+    if(SIG_ERR == signal(TOP_SIG_EXIT,top_sig_ignore)) {
+        goto fail;
+    }
+    if(SIG_ERR == signal(SIGPIPE,SIG_IGN)) {
+        goto fail;
+    }
+    sa.sa_sigaction = top_sig_action;
+    sa.sa_flags = SA_SIGINFO;
+    if(0 != sigaction(TOP_SIG_ATTACH,&sa,0)) {
+        goto fail;
+    }
+    if(0 != sigaction(TOP_SIG_RESUME,&sa,0)) {
+        goto fail;
+    }
+    assert(sched->sem);
+    sem_post((sem_t*)sched->sem);
+    if(0 == top_setjmp(sched->context)) {
+        top_schedule(sched);
+    }
+
+    if(!top_bool_cas(&sched->join_task,0,&sched->idle)) {
+        //active join_task
+    }
+out:
+    return ;
+fail:
+    printf("\nfailed to start thread: %d\n",errno);
+    sem_post((sem_t*)sched->sem);
+    sched->retval = 1;
+    goto out;
+}
+static void* top_sched_main(void* data)
+{
+    struct top_sched_s* sched = (struct top_sched_s*)data;
+    top_sched_main_loop(sched);
+    return 0;
+}
+
+top_error_t top_sched_init(struct top_sched_s* sched, const struct top_pthread_conf_s* conf)
+{
+    memset(sched,0,sizeof(*sched));
+    sched->conf = (top_pthread_conf_t*)(conf ? conf : g_top_pthread_conf_linux);
+    top_list_init(&sched->running);
+    sched->imm_pos = sched->running.first;
+    top_list_init(&sched->waiting);
+    top_list_init(&sched->sleeping);
+    top_task_init(&sched->idle,0,top_idle_main_loop,sched);
+    top_list_init((struct top_list*)&sched->idle.node);
+    sched->idle.sched = sched;
+    sched->retval = 0;
+#if 1
+    sem_t sem;
+    (void)sem_init(&sem,0,0);
+    sched->sem = &sem;
+    top_pthread_param_t tp;
+    memset(&tp,0,sizeof(tp));
+    tp.main = top_sched_main;
+    tp.main_data = sched;
+    top_error_t retno =  top_pthread_create(sched->conf,&sched->tid,&tp);
+    if(top_errno(retno) == 0) {
+        sem_wait(&sem);
+    }
+    sem_destroy(&sem);
+    return retno;
+#endif
+}
+
+void top_sched_terminate(struct top_sched_s* sched)
+{
+    if(sched->terminated == 0) {
+        sched->terminated = 1;
+        if(top_current_sched() != sched) {
+            (void)top_pthread_rt_signal(sched->conf,sched->tid,TOP_SIG_EXIT,0);
+        }
+    }
+}
+
+void top_sched_fini(struct top_sched_s* sched)
+{
+}
+
+static inline void top_sched_cleanup(struct top_sched_s* sched)
+{
 }
 
 /**
- * only invoked by sched-manager
+ *
  */
-top_error_t top_sched_join(struct top_sched_s* sch,void* data)
+top_error_t top_sched_join(struct top_sched_s* sched)
 {
-	struct top_sched_s* current = g_current_sched;
-	if(current == 0) {
-		sch->conf->join(sch->tid);
-		//clean tasks here
-		return TOP_OK;
-	}
-	return TOP_ERROR(EPERM);
+    struct top_sched_s* current = g_current_sched;
+    if(current == 0) {
+        top_pthread_join(sched->conf,sched->tid);
+        top_sched_cleanup(sched);
+        return TOP_OK;
+    } else if(current != sched) {
+        if(top_bool_cas(&sched->join_task,0, current->current)) {
+            TOP_TASK_SUSPEND(current->current);
+        }
+        top_sched_cleanup(sched);
+        return TOP_OK;
+    }
+    return TOP_ERROR(EPERM);
 }
 
-static inline void top_task_main(struct top_task_s* task) 
+static inline void top_task_main(struct top_task_s* task)
 {
-	task->sch->current = task;
-	task->retval = task->main(task,task->main_data);
-	task->state = TOP_TASK_ST_EXIT;
-	if(task->exit_handler) task->exit_handler(task,TOP_TASK_EVT_EXIT,0);
-	if(!top_bool_cas(&task->join,0,1)) {
-		top_join_cond_signal(task->join_cond);
-	}else if(task->join_task) {
-		TOP_TASK_RESUME(task->join_task);
-	}
+    top_sched_t * sched = task->sched;
+    task->state = TOP_TASK_ST_RUNNING;
+    sched->current = task;
+    task->retval = task->main(task,task->main_data);
+    //if(task->exit_handler) task->exit_handler(task,TOP_TASK_SIG_EXIT,0);
+    if(!top_bool_cas(&task->join_cond,0,(top_join_cond_t*)1)) {
+        printf("\nnotify task join: %p\n",task);
+        TOP_JOIN_COND_SIGNAL(task->join_cond, task->state = TOP_TASK_ST_EXIT);
+    } else {
+        printf("\ntask exit: %p\n",task);
+        task->state = TOP_TASK_ST_EXIT;
+        if(task->join_task) {
+            printf("\ntask resume: %p\n",task->join_task);
+            TOP_TASK_RESUME(task->join_task);
+        }
+    }
+    top_schedule(sched);
 }
 
-static inline void top_task_retore_context(struct top_task_s* task) {
-	task->sch->current = task;
-	top_long_jmp(&task->context,1);
-}
-
-void top_schedule(struct top_sched_s* sch) 
+static inline void top_task_restore_context(struct top_task_s* task)
 {
-	top_task_t * task;
-	if(!top_list_empty(&sch->running)) {
-		task = top_list_entry(sch->running.first,top_task_t,node);
-		top_list_node_del(&task->node);
-		task = &sch->idle;
-	}else {
-		task = &sch->idle;
-	}
-	sch->current = task;
-	switch(task->state) {
-	case TOP_TASK_ST_INIT:
-		top_task_main(task);
-		break;
-	default:
-		top_task_restore_context(task);
-		break;
-	}
+    task->state = TOP_TASK_ST_RUNNING;
+    task->sched->current = task;
+    top_longjmp(task->context,1);
 }
 
-void top_task_init(struct top_task_s* task,top_task_main main,void* main_data) {
-	task->flag = 0;
-	task->state = 0;
-	task->main = main;
-	task->main_data = main_data;
+void top_schedule(struct top_sched_s* sched)
+{
+    top_task_t * task;
+    if(!top_list_empty(&sched->running)) {
+        task = top_list_entry(top_list_remove_first(&sched->running),top_task_t,node);
+        if(sched->imm_pos == &task->node) sched->imm_pos = (struct top_list_node*)&sched->running;
+        printf("\ntop_schedule: %p\n",task);
+    } else {
+        printf("\ntop_schedule: idle_task\n");
+        task = &sched->idle;
+    }
+    sched->current = task;
+    switch(task->state) {
+    case TOP_TASK_ST_INIT:
+        printf("\n init \n");
+        top_task_main(task);
+        break;
+    default:
+        printf("\n long jmp \n");
+        top_task_restore_context(task);
+        break;
+    }
 }
 
-top_error_t top_task_attach(struct top_task_s* task,struct top_sched_s* sch) {
-	if(task->state == TOP_TASK_ST_INIT) {
-		task->state = TOP_TASK_ST_PENDING;
-	if(sch == g_current_sched) {
-		top_list_add_tail(&sch->running,&task->node);
-		++sch->running_count;
-		return TOP_OK;
-	}else {
-		return top_pthread_rt_signal(sch->conf,sch->tid,TOP_SIG_AWAKE,task);
-	}
-	}
-	return TOP_ERROR(-1);
+void top_task_init(struct top_task_s* task,top_task_conf_t* conf,top_task_main_loop main,void* main_data)
+{
+    memset(task,0,sizeof(*task));
+    task->main = main;
+    task->main_data = main_data;
 }
 
-void top_task_yield(struct top_task_s* task) {
-	assert(task->sched == g_current_sched);
-	top_list_add_tail(&task->sched->running,&task->node);
-	TOP_TASK_SUSPEND(task);
+top_error_t top_task_active(struct top_task_s* task,struct top_sched_s* sched)
+{
+    if(task->state == TOP_TASK_ST_INIT) {
+        task->sched = sched;
+        if(sched == g_current_sched) {
+            top_list_add_tail(&sched->running,&task->node);
+            return TOP_OK;
+        } else {
+            return top_pthread_rt_signal(sched->conf,sched->tid,TOP_SIG_ATTACH,task);
+        }
+    }
+    return TOP_ERROR(-1);
+}
+
+top_error_t top_task_restart(struct top_task_s* task,struct top_sched_s* sched)
+{
+    task->state = TOP_TASK_ST_INIT;
+    if(task->sched == sched) {
+        top_list_add_tail(&sched->running,&task->node);
+        return TOP_OK;
+    } else {
+        task->sched = sched;
+        return top_pthread_rt_signal(sched->conf,sched->tid,TOP_SIG_ATTACH,task);
+    }
+}
+
+void top_task_suspend(struct top_task_s* task)
+{
+    assert(task->sched == g_current_sched);
+    task->state = TOP_TASK_ST_SUSPEND;
+    TOP_TASK_SUSPEND(task);
+}
+
+top_error_t top_task_resume(struct top_task_s* task)
+{
+    if(task->sched == g_current_sched) {
+        assert(task->sched);
+        top_list_add_tail(&task->sched->running,&task->node);
+        return TOP_OK;
+    } else {
+        return top_pthread_rt_signal(task->sched->conf,task->sched->tid,TOP_SIG_RESUME,task);
+    }
+}
+
+void top_task_yield(struct top_task_s* task)
+{
+    assert(task->sched == g_current_sched);
+    top_list_add_tail(&task->sched->running,&task->node);
+    task->state = TOP_TASK_ST_PENDING;
+    TOP_TASK_SUSPEND(task);
 }
 
 top_error_t top_task_join(struct top_task_s* task)
 {
-	top_task_t* current = top_current_task();
-	if(current == 0) {
-		top_join_cond_t join;
-		top_join_cond_init(&join);
-		task->join_cond = &join;
-		if(top_bool_cas(&task->join,0,1)) {
-			pthread_mutex_lock(&join->mutex);
-			if(*(volatile top_task_state_e*)&task->state != TOP_TASK_ST_EXIT)
-				pthread_cond_wait(&join->cond);
-			pthread_mutex_unlock(&join->mutex);
-		}
-		top_join_cond_fini(&join);
-		return TOP_OK;
-	}else if(task != current){
-		task->join_task = current;
-		TOP_TASK_SUSPEND(current);
-		return TOP_OK;
-	}
-	return TOP_ERROR(EPERM);
+    top_task_t* current = top_current_task();
+    if(current == 0) {
+        top_join_cond_t join;
+        top_join_cond_init(&join);
+        if(top_bool_cas(&task->join_cond,0,&join)) {
+            TOP_JOIN_COND_WAIT( &join, task->state != TOP_TASK_ST_EXIT );
+        }
+        top_join_cond_fini(&join);
+        return TOP_OK;
+    } else if(task != current) {
+        task->join_task = current;
+        TOP_TASK_SUSPEND(current);
+        return TOP_OK;
+    }
+    return TOP_ERROR(EPERM);
 }
 

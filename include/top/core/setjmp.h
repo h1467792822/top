@@ -10,7 +10,7 @@ extern "C" {
 
 typedef jmp_buf top_jmp_buf;
 #define top_setjmp(ctx) _setjmp(ctx)
-#define top_longjmp(ctx) _longjmp(ctx)
+#define top_longjmp(ctx,ret) _longjmp(ctx,ret)
 
 
 #ifdef __cplusplus

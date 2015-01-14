@@ -13,15 +13,15 @@ extern "C" {
 
 #define top_list_entry(ptr,type,member) top_container_of(ptr,type,member)
 
-struct top_list_node {
+typedef struct top_list_node {
 	struct top_list_node* next;
 	struct top_list_node* prev;
-};
+}top_list_node_t;
 
-struct top_list {
+typedef struct top_list {
 	struct top_list_node* first;
 	struct top_list_node* last;
-};
+}top_list_t;
 
 #define TOP_LIST_INIT(name) {(struct top_list_node*)&name,(struct top_list_node*)&name}
 

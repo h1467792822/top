@@ -23,14 +23,14 @@ extern "C" {
 #endif
 
 struct top_alloc;
-struct top_pool_conf
+typedef struct top_pool_conf
 {
 	struct top_alloc* alloc;
 	unsigned long max_capacity;
 	unsigned int page_size; 
-};
+}top_pool_conf_t;
 
-struct top_pool
+typedef struct top_pool
 {
 	struct top_list pages;
 	struct top_pool_page* current;
@@ -44,7 +44,7 @@ struct top_pool
 	unsigned long large_alloc_count;
 	unsigned long large_free_count;
 	struct top_pool_conf conf;
-};
+}top_pool_t;
 
 void top_pool_init(struct top_pool* pool,const struct top_pool_conf* conf);
 

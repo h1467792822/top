@@ -4,6 +4,10 @@
 
 #include <pthread.h>
 
+#ifndef TOP_CORE_ERROR_H
+#include <top/core/error.h>
+#endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -19,33 +23,32 @@ typedef struct top_pthread_param_s {
 }top_pthread_param_t;
 
 typedef struct top_pthread_conf_s {
-    top_error_t (*create)(void* user_data,top_pthread_t* ptid,top_pthread_param_t* param);
-    top_error_t (*rt_signal)(void* user_data,top_pthread_t tid, int signo,void* data);
-    top_error_t (*signal)(void* user_data,top_pthread_t tid, int signo);
-    top_error_t (*join)(void* user_data,top_pthread_t tid);
-	void* user_data;
+    top_error_t (*create)(struct top_pthread_conf_s* conf,top_pthread_t* ptid,top_pthread_param_t* param);
+    top_error_t (*rt_signal)(struct top_pthread_conf_s* conf,top_pthread_t tid, int signo,void* data);
+    top_error_t (*signal)(struct top_pthread_conf_s* conf,top_pthread_t tid, int signo);
+    top_error_t (*join)(struct top_pthread_conf_s* conf,top_pthread_t tid);
 } top_pthread_conf_t;
 
-extern struct top_pthread_conf_s* g_top_pthread_conf_linux;
+extern const struct top_pthread_conf_s* g_top_pthread_conf_linux;
 
-static inline top_error_t top_pthread_create(struct top_thread_conf_s* conf,top_pthread_t* ptid,top_pthread_param_t* param)
+static inline top_error_t top_pthread_create(struct top_pthread_conf_s* conf,top_pthread_t* ptid,top_pthread_param_t* param)
 {
-	return conf->create(conf->user_data,ptid,param);
+	return conf->create(conf,ptid,param);
 }
 
-static inline top_error_t top_pthread_rt_signal(struct top_thread_conf_s* conf,top_pthread_t tid,int signo,void* data)
+static inline top_error_t top_pthread_rt_signal(struct top_pthread_conf_s* conf,top_pthread_t tid,int signo,void* data)
 {
-	return conf->rt_signal(conf->user_data,tid,signo,data);
+	return conf->rt_signal(conf,tid,signo,data);
 }
 
-static inline top_error_t top_pthread_signal(struct top_thread_conf_s* conf,top_pthread_t tid,int signo)
+static inline top_error_t top_pthread_signal(struct top_pthread_conf_s* conf,top_pthread_t tid,int signo)
 {
-	return conf->signal(conf->user_data,tid,signo);
+	return conf->signal(conf,tid,signo);
 }
 
-static inline top_error_t top_pthread_join(struct top_thread_conf_s* conf,top_pthread_t tid)
+static inline top_error_t top_pthread_join(struct top_pthread_conf_s* conf,top_pthread_t tid)
 {
-	return conf->join(conf->user_data,tid);
+	return conf->join(conf,tid);
 }
 
 

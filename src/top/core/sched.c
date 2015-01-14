@@ -1,6 +1,5 @@
 
 #include <pthread.h>
-#include <sys/select.h>
 #include <signal.h>
 #include <errno.h>
 #include <string.h>
@@ -78,6 +77,9 @@ static void top_sig_action(int signo,siginfo_t* info,void* ucontext)
         top_list_add_tail(&task->sched->running,&task->node);
         break;
     }
+	int val = 0;
+	(int)sem_getvalue((sem_t*)task->sched->sem,&val);
+	if(val == 0) sem_post((sem_t*)task->sched->sem);
 }
 
 static void* top_idle_main_loop(struct top_task_s* task, void* data)
@@ -85,7 +87,7 @@ static void* top_idle_main_loop(struct top_task_s* task, void* data)
     top_sched_t * sched = task->sched;
     struct timeval tm = { 0, 1000 };
     while(sched->terminated == 0) {
-        select(0,0,0,0,&tm);
+		sem_wait((sem_t*)sched->sem);
         TOP_TASK_SUSPEND(task);
     }
     ++sched->terminated;
@@ -100,6 +102,10 @@ static void top_sig_ignore(int signo)
 
 void top_sched_main_loop(top_sched_t* sched)
 {
+	sem_t sem;
+	sem_init(&sem,0,0);
+	sem_t* psem = sched->sem;
+	sched->sem = &sem;
     g_current_sched = sched;
     struct sigaction sa;
     memset(&sa,0,sizeof(sa));
@@ -117,8 +123,7 @@ void top_sched_main_loop(top_sched_t* sched)
     if(0 != sigaction(TOP_SIG_RESUME,&sa,0)) {
         goto fail;
     }
-    assert(sched->sem);
-    sem_post((sem_t*)sched->sem);
+    sem_post(psem);
     if(0 == top_setjmp(sched->context)) {
         top_schedule(sched);
     }
@@ -130,7 +135,7 @@ out:
     return ;
 fail:
     printf("\nfailed to start thread: %d\n",errno);
-    sem_post((sem_t*)sched->sem);
+    sem_post(psem);
     sched->retval = 1;
     goto out;
 }
@@ -174,9 +179,7 @@ void top_sched_terminate(struct top_sched_s* sched)
 {
     if(sched->terminated == 0) {
         sched->terminated = 1;
-        if(top_current_sched() != sched) {
-            (void)top_pthread_rt_signal(sched->conf,sched->tid,TOP_SIG_EXIT,0);
-        }
+        (void)sem_post((sem_t*)sched->sem);
     }
 }
 
@@ -297,7 +300,10 @@ void top_task_suspend(struct top_task_s* task)
 {
     assert(task->sched == g_current_sched);
     task->state = TOP_TASK_ST_SUSPEND;
-    TOP_TASK_SUSPEND(task);
+	unsigned int flags = top_fetch_and_and(task->flags,~TOP_TASK_FL_RESUME);
+	if(!(flags & TOP_TASK_FL_RESUME)) {
+		TOP_TASK_SUSPEND(task);
+	}
 }
 
 top_error_t top_task_resume(struct top_task_s* task)

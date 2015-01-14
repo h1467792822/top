@@ -38,17 +38,29 @@ typedef enum top_task_state_enum {
 	TOP_TASK_ST_SUSPEND,
 	TOP_TASK_ST_COND_WAIT,
 	TOP_TASK_ST_LOCK_WAIT,
-	TOP_TASK_ST_EVENT_WAIT,
+	TOP_TASK_ST_SEM_WAIT,
 	TOP_TASK_ST_SLEEP,
 	TOP_TASK_ST_EXIT,
 }top_task_state_e;
 
+typedef enum top_task_flag_enum {
+	TOP_TASK_FL_RUN = 1ul,
+	TOP_TASK_FL_LOCK_WAIT = 1ul << 1,
+	TOP_TASK_FL_COND_WAIT = 1ul << 2,
+	TOP_TASK_FL_SEM_WAIT = 1ul << 3,
+	TOP_TASK_FL_SLEEP = 1ul << 4,
+	TOP_TASK_FL_RESUME = 1ul << 5,
+	TOP_TASK_FL_SIG = 1ul << 6,
+	TOP_TASK_FL_RT_SIG = 1ul << 7,
+	TOP_TASK_FL_EXIT = 1ul << 15,
+}top_task_flag_e;
+
 typedef void (*top_task_sig_handler)(struct top_task_s* task,int evt,void* data);
 
 typedef struct top_task_conf_s {
-	int evt_max;
-	int rt_evt_max;
-	int rt_evt_max_pending;
+	int sig_max;
+	int rt_sig_max;
+	int rt_sig_max_pending;
 }top_task_conf_t;
 
 typedef struct top_task_rt_event_queue_s {

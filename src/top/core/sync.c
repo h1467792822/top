@@ -1,6 +1,7 @@
 
 #include <assert.h>
 #include <errno.h>
+#include <stdio.h>
 #include <top/core/sync.h>
 #include <top/core/sched.h>
 
@@ -95,7 +96,7 @@ void top_sem_wait(top_sem_t* sem)
     if(sem->value == 0) {
         ++sem->waiting_count;
         top_list_add_tail(&sem->waiting,&task->node);
-        task->state = TOP_TASK_ST_EVENT_WAIT;
+        task->state = TOP_TASK_ST_SEM_WAIT;
         TOP_TASK_SUSPEND(task);
     }
     --sem->value ;

@@ -91,7 +91,7 @@ static void* top_idle_main_loop(struct top_task_s* task, void* data)
         TOP_TASK_SUSPEND(task);
     }
     ++sched->terminated;
-    top_longjmp(sched->context,1);
+    top_longjmp(sched->main_context,1);
     return 0;
 }
 
@@ -124,7 +124,7 @@ void top_sched_main_loop(top_sched_t* sched)
         goto fail;
     }
     sem_post(psem);
-    if(0 == top_setjmp(sched->context)) {
+    if(0 == top_setjmp(sched->main_context)) {
         top_schedule(sched);
     }
 
@@ -211,12 +211,17 @@ top_error_t top_sched_join(struct top_sched_s* sched)
     return TOP_ERROR(EPERM);
 }
 
-static inline void top_task_main(struct top_task_s* task)
+static void top_task_main(struct top_task_s* task)
 {
     top_sched_t * sched = task->sched;
     task->state = TOP_TASK_ST_RUNNING;
     sched->current = task;
     task->retval = task->main(task,task->main_data);
+	unsigned int flag = top_fetch_and_or(task->flags,TOP_TASK_FL_EXIT);
+	if(flag & TOP_TASK_FL_SIG) {
+		TOP_TASK_SUSPEND(task);
+	}
+
     //if(task->exit_handler) task->exit_handler(task,TOP_TASK_SIG_EXIT,0);
     if(!top_bool_cas(&task->join_cond,0,(top_join_cond_t*)1)) {
         printf("\nnotify task join: %p\n",task);
@@ -229,7 +234,8 @@ static inline void top_task_main(struct top_task_s* task)
             TOP_TASK_RESUME(task->join_task);
         }
     }
-    top_schedule(sched);
+    TOP_RESCHEDULE(sched);
+	__builtin_unreachable();
 }
 
 static inline void top_task_restore_context(struct top_task_s* task)
@@ -241,7 +247,11 @@ static inline void top_task_restore_context(struct top_task_s* task)
 
 void top_schedule(struct top_sched_s* sched)
 {
+	if(top_setjmp(sched->sched_context)){
+		printf("\nreschedule:%d \n",1);
+	}
     top_task_t * task;
+	int count = 0;
     if(!top_list_empty(&sched->running)) {
         task = top_list_entry(top_list_remove_first(&sched->running),top_task_t,node);
         if(sched->imm_pos == &task->node) sched->imm_pos = (struct top_list_node*)&sched->running;
@@ -253,14 +263,17 @@ void top_schedule(struct top_sched_s* sched)
     sched->current = task;
     switch(task->state) {
     case TOP_TASK_ST_INIT:
-        printf("\n init \n");
+        printf("\n init :%p\n",task);
         top_task_main(task);
         break;
     default:
-        printf("\n long jmp \n");
+        printf("\n long jmp: %p \n",task);
         top_task_restore_context(task);
         break;
     }
+
+	printf("\n **** shouldn't reach here! *** \n");
+	__builtin_unreachable();
 }
 
 void top_task_init(struct top_task_s* task,top_task_conf_t* conf,top_task_main_loop main,void* main_data)
@@ -300,10 +313,10 @@ void top_task_suspend(struct top_task_s* task)
 {
     assert(task->sched == g_current_sched);
     task->state = TOP_TASK_ST_SUSPEND;
-	unsigned int flags = top_fetch_and_and(task->flags,~TOP_TASK_FL_RESUME);
-	if(!(flags & TOP_TASK_FL_RESUME)) {
+	//unsigned int flags = top_fetch_and_and(task->flags,~TOP_TASK_FL_RESUME);
+	//if(!(flags & TOP_TASK_FL_RESUME)) {
 		TOP_TASK_SUSPEND(task);
-	}
+	//}
 }
 
 top_error_t top_task_resume(struct top_task_s* task)
@@ -342,5 +355,61 @@ top_error_t top_task_join(struct top_task_s* task)
         return TOP_OK;
     }
     return TOP_ERROR(EPERM);
+}
+
+void top_task_sigaction(top_task_t* task,int sig,top_task_sig_handler handler)
+{
+	if(handler) {
+		task->sig_handler_mask |= 1u << sig;
+		task->sigs[sig].handler = handler;
+	}else {
+		task->sig_handler_mask &= ~(1ul << sig);
+		task->sigs[sig].handler = 0;
+	}
+}
+
+void top_task_rt_sigaction(top_task_t* task,int sig,top_task_sig_handler handler)
+{
+	if(handler) {
+		task->rt_sig_handler_mask |= 1u << sig;
+		task->rt_sigs[sig].handler = handler;
+	}else {
+		task->rt_sig_handler_mask &= ~(1ul << sig);
+		task->rt_sigs[sig].handler = 0;
+	}
+}
+
+static inline void top_task_dispatch_signal(struct top_task_s* task,int sig_no)
+{
+	unsigned int sigmask = top_fetch_and_and(task->sigmask,0) & task->sig_handler_mask;
+	if(!sigmask) return;
+	int sig_count = __builtin_popcount(sigmask);	
+	int offset;
+	for(; sig_count; --sig_count) {
+		offset = __builtin_ctz(sig_count);
+		sig_count &= ~(1ul << offset);
+		task->sigs[offset].handler(task,offset,0);
+	}
+}
+
+top_error_t top_error_t top_task_signal(struct top_task_s* task, int sig_no)
+{
+	assert(sig_no >= 0 && sig_no < 32);
+	unsigned int sigmask = 1u << sig_no;
+	if(0 == (task->sig_handler_mask & sigmask)) return TOP_OK;
+
+	top_sched_t* sched = top_current_sched();
+	unsigned int old_sigmask = top_fetch_and_or(task->sigmask,sigmask);
+
+	if(sigmask & old_sigmask) return TOP_OK;
+
+	if(sched == task->sched) {
+		if(task->state == TOP_TASK_ST_EXIT) return TOP_ERROR(EEXIST);
+		top_task_dispatch_sig(task,sig_no);		
+	}else {
+		unsigned int flag = top_fetch_and_or(task->flags,TOP_TASK_FL_SIG);
+		if(flag & TOP_TASK_FL_EXIT) return TOP_ERROR(EEXIST);
+		task->sigs[sig_no].val = 1;
+	}
 }
 

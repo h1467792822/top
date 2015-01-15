@@ -55,6 +55,13 @@ typedef enum top_task_flag_enum {
 	TOP_TASK_FL_EXIT = 1ul << 15,
 }top_task_flag_e;
 
+#define TOP_TASK_SIG_EXIT 31  //task 退出是最后发送给自己的信号，用户可以注册在这个信号处理中完成资源清理动作, 保证只会被调用一次
+#define TOP_TASK_SIG_TERM 30  //sched 调用terminate的时候发送给所有的task的信号，task收到这个信号后应该尽快完成退出动作, 保证只会被调用一次
+#define TOP_TASK_SIG_MIN 0
+#define TOP_TASK_SIG_MAX 15 
+#define TOP_TASK_RT_SIG_MIN 32
+#define TOP_TASK_RT_SIG_MAX 47 
+
 typedef void (*top_task_sig_handler)(struct top_task_s* task,int evt,void* data);
 
 typedef struct top_task_conf_s {
@@ -63,15 +70,15 @@ typedef struct top_task_conf_s {
 	int rt_sig_max_pending;
 }top_task_conf_t;
 
-typedef struct top_task_rt_event_queue_s {
-	void* events;
+typedef struct top_task_rt_sig_s {
+	void* sigs;
 	int count;
 	top_task_sig_handler handler;
-}top_task_rt_event_queue_t;
+}top_task_rt_sig_t;
 
-typedef struct top_task_event_s {
+typedef struct top_task_sig_s {
 	top_task_sig_handler handler;
-}top_task_event_t;
+}top_task_sig_t;
 
 // sizeof(empty struct) == sizeof(size_t) in c++
 // sizeof(empty struct) == 0 in c
@@ -86,8 +93,13 @@ typedef struct top_task_s {
 	struct top_list_node node;
 	top_task_stat_t stat;
 	top_jmp_buf context;
-	top_task_rt_event_queue_t* rt_events;
-	top_task_event_t* events;
+	top_task_rt_sig_queue_t* rt_sigs;
+	unsigned int sigmask;
+	unsigned int sig_handler_mask;
+	unsigned int rt_sigmask;
+	unsigned int rt_sig_handler_mask;
+	top_task_sig_t* sigs;
+	top_task_rt_sig_t* rt_sigs;
 	top_task_conf_t conf;
 	top_pool_t pool;
 	void* main_data;
@@ -136,7 +148,8 @@ typedef struct top_sched_s {
 	int retval;
 	volatile int terminated;
 	void* sem;
-	top_jmp_buf context;
+	top_jmp_buf main_context;
+	top_jmp_buf sched_context;
 }top_sched_t;
 
 void top_sched_main_loop(struct top_sched_s* sched);
@@ -149,10 +162,14 @@ void top_sched_terminate(struct top_sched_s* sch);
 top_error_t top_sched_join(struct top_sched_s* sch);
 void top_sched_fini(struct top_sched_s* sch);
 
+#define TOP_RESCHEDULE(sched) \
+	top_schedule(sched)
+
 #define TOP_TASK_SUSPEND(task) \
 	do { \
+		printf("\n suspend task: %p\n", (task)); \
 	if(0 == top_setjmp((task)->context)) { \
-		top_schedule((task)->sched); \
+		TOP_RESCHEDULE((task)->sched); \
 	}\
 	}while(0)
 

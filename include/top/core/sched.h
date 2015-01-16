@@ -62,6 +62,10 @@ typedef enum top_task_flag_enum {
 #define TOP_TASK_RT_SIG_MIN 32
 #define TOP_TASK_RT_SIG_MAX 47 
 
+#define TOP_TASK_PRIV_FL_PENDING 1u
+#define TOP_TASK_PRIV_FL_SIGNAL (1u << 1)
+#define TOP_TASK_PRIV_FL_EXIT (1u << 15)
+
 typedef void (*top_task_sig_handler)(struct top_task_s* task,int evt,void* data);
 
 typedef struct top_task_conf_s {
@@ -71,8 +75,11 @@ typedef struct top_task_conf_s {
 }top_task_conf_t;
 
 typedef struct top_task_rt_sig_s {
-	void* sigs;
-	int count;
+	void** datas;
+	unsigned int count;
+	uint64_t low_idx;
+	uint64_t high_idx;
+	uint64_t idx_mask;
 	top_task_sig_handler handler;
 }top_task_rt_sig_t;
 
@@ -87,13 +94,14 @@ typedef struct top_task_stat_s {
 } top_task_stat_t;
 
 typedef struct top_task_s {
-	int state;
-	int flags;
+	unsigned int state;
+	unsigned int flags;
+	unsigned int priv_flags;
 	struct top_sched_s* sched;
 	struct top_list_node node;
+	struct top_list_node sig_node;
 	top_task_stat_t stat;
 	top_jmp_buf context;
-	top_task_rt_sig_queue_t* rt_sigs;
 	unsigned int sigmask;
 	unsigned int sig_handler_mask;
 	unsigned int rt_sigmask;
@@ -136,6 +144,7 @@ typedef struct top_sched_stat_s {
 
 typedef struct top_sched_s {
 	struct top_list running;
+	struct top_list sig_running;
 	struct top_list_node* imm_pos;
 	struct top_list waiting;
 	struct top_list sleeping;
@@ -174,7 +183,7 @@ void top_sched_fini(struct top_sched_s* sch);
 	}while(0)
 
 #define TOP_TASK_RESUME(task) \
-		top_list_add_tail(&(task)->sched->running,&(task)->node)
+		top_task_resume(task)
 	
 
 #ifdef __cplusplus

@@ -44,7 +44,8 @@ static inline void top_join_cond_fini(top_join_cond_t* cond)
 
 #define TOP_SIG_ATTACH (SIGRTMIN) //将task挂接到running队列中去
 #define TOP_SIG_RESUME (SIGRTMIN + 1) //将task挂接到running队列中去
-#define TOP_SIG_EXIT (SIGRTMIN + 2) //通知退出
+#define TOP_SIG_EXIT SIGUSR1 //通知退出
+#define TOP_SIG_SIGNAL SIGUSR2
 
 static __thread struct top_sched_s* g_current_sched = 0;
 
@@ -60,6 +61,22 @@ top_task_t* top_current_task()
 }
 
 void top_schedule(struct top_sched_s* sched) ;
+
+static inline void top_sched_task_pending(top_sched_t* sched, top_task_t* task)
+{
+	if(0 == (task->priv_flags & TOP_TASK_PRIV_FL_PENDING)) {
+		top_list_add_tail(&sched->running,&task->node);
+		task->priv_flags |= TOP_TASK_PRIV_FL_PENDING;
+	}
+}
+
+static inline void top_sched_task_signal(top_sched_t* sched,top_task_t* task)
+{
+	if(0 == (task->priv_flags & TOP_TASK_PRIV_FL_SIGNAL)) {
+		top_list_add_tail(&sched->sig_running,&task->sig_node);
+		task->priv_flags |= TOP_TASK_PRIV_FL_SIGNAL;
+	}
+}
 
 static void top_sig_action(int signo,siginfo_t* info,void* ucontext)
 {
@@ -150,6 +167,7 @@ top_error_t top_sched_init(struct top_sched_s* sched, const struct top_pthread_c
 {
     memset(sched,0,sizeof(*sched));
     sched->conf = (top_pthread_conf_t*)(conf ? conf : g_top_pthread_conf_linux);
+    top_list_init(&sched->sig_running);
     top_list_init(&sched->running);
     sched->imm_pos = sched->running.first;
     top_list_init(&sched->waiting);
@@ -217,8 +235,9 @@ static void top_task_main(struct top_task_s* task)
     task->state = TOP_TASK_ST_RUNNING;
     sched->current = task;
     task->retval = task->main(task,task->main_data);
-	unsigned int flag = top_fetch_and_or(task->flags,TOP_TASK_FL_EXIT);
+	unsigned int flag = top_fetch_and_or(&task->flags,TOP_TASK_FL_EXIT);
 	if(flag & TOP_TASK_FL_SIG) {
+		printf("\n waiting signal \n");
 		TOP_TASK_SUSPEND(task);
 	}
 
@@ -231,7 +250,7 @@ static void top_task_main(struct top_task_s* task)
         task->state = TOP_TASK_ST_EXIT;
         if(task->join_task) {
             printf("\ntask resume: %p\n",task->join_task);
-            TOP_TASK_RESUME(task->join_task);
+            (void)top_task_resume(task->join_task);
         }
     }
     TOP_RESCHEDULE(sched);
@@ -245,16 +264,71 @@ static inline void top_task_restore_context(struct top_task_s* task)
     top_longjmp(task->context,1);
 }
 
-void top_schedule(struct top_sched_s* sched)
+static inline void top_task_process_rt_signal(struct top_task_s* task, int signo, top_task_rt_sig_t* rt_sig)
 {
-	if(top_setjmp(sched->sched_context)){
-		printf("\nreschedule:%d \n",1);
+	int count = rt_sig->count;
+	(void)top_fetch_and_sub(&rt_sig->count,count);
+	unsigned int idx;
+	void* data;
+	for(; count; --count, ++rt_sig->low_idx) {
+		idx = rt_sig->low_idx & rt_sig->idx_mask;
+		data = rt_sig->datas[idx];
+		if(data != rt_sig) {
+			rt_sig->handler(task,signo,rt_sig->datas[idx]);
+			rt_sig->datas[idx] = rt_sig;
+		}else {
+			//外部的数据还没有写入，需要等待下一次机会
+			(void)top_fetch_and_add(&rt_sig->count,count);
+			(void)top_fetch_and_or(&task->rt_sigmask, 1u << idx);
+		}
 	}
+}
+
+static inline void top_task_dispatch_rt_signal(struct top_task_s* task)
+{
+	unsigned int sigmask = top_fetch_and_and(&task->rt_sigmask,0) & task->sig_handler_mask;
+	if(!sigmask) return;
+	int sig_count = __builtin_popcount(sigmask);	
+	int offset;
+	for(; sig_count; --sig_count) {
+		offset = __builtin_ctz(sig_count);
+		sig_count &= ~(1ul << offset);
+		top_task_process_rt_signo(task,offset + 32,&task->rt_sigs[offset]);
+	}
+}
+
+static inline void top_task_dispatch_signal(struct top_task_s* task)
+{
+	unsigned int sigmask = top_fetch_and_and(&task->sigmask,0) & task->sig_handler_mask;
+	if(!sigmask) return;
+	int sig_count = __builtin_popcount(sigmask);	
+	int offset;
+	for(; sig_count; --sig_count) {
+		offset = __builtin_ctz(sig_count);
+		sig_count &= ~(1ul << offset);
+		task->sigs[offset].handler(task,offset,0);
+	}
+}
+
+static void top_schedule_pending(struct top_sched_s* sched)
+{
+	if(!top_list_empty(&sched->sig_running)) {
+		top_task_t* task;
+        task = top_list_entry(top_list_remove_first(&sched->sig_running),top_task_t,node);
+		task->priv_flags &= ~TOP_TASK_PRIV_FL_SIGNAL;
+		top_task_dispatch_signal(task);
+		top_task_dispatch_rt_signal(task);
+	}
+}
+
+static void top_schedule_pending(struct top_sched_s* sched)
+{
     top_task_t * task;
 	int count = 0;
     if(!top_list_empty(&sched->running)) {
         task = top_list_entry(top_list_remove_first(&sched->running),top_task_t,node);
         if(sched->imm_pos == &task->node) sched->imm_pos = (struct top_list_node*)&sched->running;
+		task->priv_flags &= ~TOP_TASK_PRIV_FL_PENDING;
         printf("\ntop_schedule: %p\n",task);
     } else {
         printf("\ntop_schedule: idle_task\n");
@@ -276,6 +350,12 @@ void top_schedule(struct top_sched_s* sched)
 	__builtin_unreachable();
 }
 
+void top_schedule(struct top_sched_s* sched)
+{
+	top_schedule_signal(sched);
+	top_schedule_pending(sched);
+}
+
 void top_task_init(struct top_task_s* task,top_task_conf_t* conf,top_task_main_loop main,void* main_data)
 {
     memset(task,0,sizeof(*task));
@@ -288,7 +368,7 @@ top_error_t top_task_active(struct top_task_s* task,struct top_sched_s* sched)
     if(task->state == TOP_TASK_ST_INIT) {
         task->sched = sched;
         if(sched == g_current_sched) {
-            top_list_add_tail(&sched->running,&task->node);
+			top_sched_task_pending(sched,task);
             return TOP_OK;
         } else {
             return top_pthread_rt_signal(sched->conf,sched->tid,TOP_SIG_ATTACH,task);
@@ -301,7 +381,7 @@ top_error_t top_task_restart(struct top_task_s* task,struct top_sched_s* sched)
 {
     task->state = TOP_TASK_ST_INIT;
     if(task->sched == sched) {
-        top_list_add_tail(&sched->running,&task->node);
+		top_sched_task_pending(sched,task);
         return TOP_OK;
     } else {
         task->sched = sched;
@@ -323,7 +403,7 @@ top_error_t top_task_resume(struct top_task_s* task)
 {
     if(task->sched == g_current_sched) {
         assert(task->sched);
-        top_list_add_tail(&task->sched->running,&task->node);
+		top_sched_task_pending(task->sched,task);
         return TOP_OK;
     } else {
         return top_pthread_rt_signal(task->sched->conf,task->sched->tid,TOP_SIG_RESUME,task);
@@ -333,7 +413,7 @@ top_error_t top_task_resume(struct top_task_s* task)
 void top_task_yield(struct top_task_s* task)
 {
     assert(task->sched == g_current_sched);
-    top_list_add_tail(&task->sched->running,&task->node);
+	top_sched_task_pending(task->sched,task);
     task->state = TOP_TASK_ST_PENDING;
     TOP_TASK_SUSPEND(task);
 }
@@ -357,8 +437,9 @@ top_error_t top_task_join(struct top_task_s* task)
     return TOP_ERROR(EPERM);
 }
 
-void top_task_sigaction(top_task_t* task,int sig,top_task_sig_handler handler)
+top_error_t top_task_sigaction(top_task_t* task,int sig,top_task_sig_handler handler)
 {
+	if(sig < TOP_TASK_SIG_MIN || sig > TOP_TASK_SIG_MAX) return TOP_ERROR(EINVAL);
 	if(handler) {
 		task->sig_handler_mask |= 1u << sig;
 		task->sigs[sig].handler = handler;
@@ -366,10 +447,12 @@ void top_task_sigaction(top_task_t* task,int sig,top_task_sig_handler handler)
 		task->sig_handler_mask &= ~(1ul << sig);
 		task->sigs[sig].handler = 0;
 	}
+	return TOP_OK;
 }
 
-void top_task_rt_sigaction(top_task_t* task,int sig,top_task_sig_handler handler)
+top_error_t top_task_rt_sigaction(top_task_t* task,int sig,top_task_sig_handler handler)
 {
+	if(sig < TOP_TASK_RT_SIG_MIN || sig > TOP_TASK_RT_SIG_MAX) return TOP_ERROR(EINVAL);
 	if(handler) {
 		task->rt_sig_handler_mask |= 1u << sig;
 		task->rt_sigs[sig].handler = handler;
@@ -377,39 +460,63 @@ void top_task_rt_sigaction(top_task_t* task,int sig,top_task_sig_handler handler
 		task->rt_sig_handler_mask &= ~(1ul << sig);
 		task->rt_sigs[sig].handler = 0;
 	}
+	return TOP_OK;
 }
 
-static inline void top_task_dispatch_signal(struct top_task_s* task,int sig_no)
-{
-	unsigned int sigmask = top_fetch_and_and(task->sigmask,0) & task->sig_handler_mask;
-	if(!sigmask) return;
-	int sig_count = __builtin_popcount(sigmask);	
-	int offset;
-	for(; sig_count; --sig_count) {
-		offset = __builtin_ctz(sig_count);
-		sig_count &= ~(1ul << offset);
-		task->sigs[offset].handler(task,offset,0);
-	}
-}
-
-top_error_t top_error_t top_task_signal(struct top_task_s* task, int sig_no)
+top_error_t top_task_signal(struct top_task_s* task, int sig_no)
 {
 	assert(sig_no >= 0 && sig_no < 32);
-	unsigned int sigmask = 1u << sig_no;
-	if(0 == (task->sig_handler_mask & sigmask)) return TOP_OK;
-
 	top_sched_t* sched = top_current_sched();
-	unsigned int old_sigmask = top_fetch_and_or(task->sigmask,sigmask);
+	unsigned int sigmask = 1u << sig_no;
+	unsigned int old_sigmask = top_fetch_and_or(&task->sigmask,sigmask);
 
-	if(sigmask & old_sigmask) return TOP_OK;
+	if(old_sigmask & TOP_TASK_PRIV_FL_EXIT){
+		return TOP_ERROR(EEXIST);
+	}
+	
+	if(old_sigmask) return TOP_OK;
 
 	if(sched == task->sched) {
-		if(task->state == TOP_TASK_ST_EXIT) return TOP_ERROR(EEXIST);
-		top_task_dispatch_sig(task,sig_no);		
+		top_sched_task_signal(sched,task);
+		return TOP_OK;
 	}else {
-		unsigned int flag = top_fetch_and_or(task->flags,TOP_TASK_FL_SIG);
-		if(flag & TOP_TASK_FL_EXIT) return TOP_ERROR(EEXIST);
-		task->sigs[sig_no].val = 1;
+		return top_pthread_signal(sched->conf,sched->tid,TOP_SIG_SIGNAL);
 	}
+}
+
+static inline top_error_t top_task_push_back_rt_sig(top_task_t* task, int sig, void* data)
+{
+#if 0
+	assert(sig >= 32 && sig <= 63);
+	sig -= 32;
+	f(top_add_and_fetch(&task->rt_sigs[sig].count,1));
+#endif
+	return TOP_OK;
+}
+
+top_error_t top_task_rt_signal(struct top_task_s* task, int sig_no,void* data)
+{
+	assert(sig_no >= 0 && sig_no < 32);
+	top_sched_t* sched = top_current_sched();
+	unsigned int sigmask = 1u << sig_no;
+	unsigned int old_sigmask = top_fetch_and_or(&task->rt_sigmask,sigmask);
+	top_error_t err;
+
+	if(old_sigmask & TOP_TASK_PRIV_FL_EXIT){
+		return TOP_ERROR(EEXIST);
+	}
+	
+	if(old_sigmask) return TOP_OK;
+
+	/** 即便出错，也需要发送信号 */
+	err = top_task_push_back_rt_sig(task,sig_no,data);	
+	if(sched == task->sched) {
+		top_sched_task_signal(sched,task);
+	}else {
+		top_error_t sig_err;
+		sig_err = top_pthread_signal(sched->conf,sched->tid,TOP_SIG_SIGNAL);
+		if(top_errno(sig_err)) return sig_err;
+	}
+	return err;
 }
 

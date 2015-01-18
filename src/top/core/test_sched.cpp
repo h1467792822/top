@@ -21,6 +21,7 @@ class TestSched: public CPPUNIT_NS::TestFixture
     CPPUNIT_TEST_SUITE(TestSched);
     CPPUNIT_TEST( testOneTask );
     CPPUNIT_TEST( testChildTask );
+    CPPUNIT_TEST( testSignal );
     CPPUNIT_TEST_SUITE_END();
 	top_sched_t sched;
 public:
@@ -68,6 +69,50 @@ public:
 		CPPUNIT_ASSERT_EQUAL(d,(long)&d);
 		CPPUNIT_ASSERT_EQUAL((void*)task.retval,(void*)100);
 	}
+
+	static void sig_0(top_task_t* task,void* data,int sig,void* sig_data)
+	{
+		switch(sig) {
+			case 0:
+				printf("\n .0 signal\n");
+				top_task_signal(task,1);
+				break;
+			case 1:
+				printf("\n .1 signal\n");
+				top_task_signal(task,2);
+				break;
+			case 2:
+				printf("\n .2 signal\n");
+				*(int*)data = 1;
+				top_task_resume(task);
+				break;
+		}
+	}
+
+	static void* signal_run(top_task_t* task,void* data)
+	{
+		top_task_sigaction(task,0,sig_0);
+		top_task_sigaction(task,1,sig_0);
+		top_task_sigaction(task,2,sig_0);
+
+		int* pe = (int*)data;
+		while(*pe == 0) {
+			top_task_suspend(task);
+		}
+		return 0;
+	}
+
+	void testSignal()
+	{
+		long d = 0;
+		top_task_t task;
+		top_task_init(&task,0,signal_run,&d);
+		top_task_active(&task,&sched);
+		top_task_signal(&task,0);
+		top_task_join(&task);
+		CPPUNIT_ASSERT_EQUAL(d,1l);
+	}
+
 };
 
 CPPUNIT_TEST_SUITE_REGISTRATION( TestSched );

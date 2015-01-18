@@ -24,7 +24,7 @@ void top_mutex_lock(top_mutex_t* mutex)
     if(mutex->locked) {
         top_list_add_tail(&mutex->waiting,&task->node);
         ++mutex->waiting_count;
-        task->state = TOP_TASK_ST_LOCK_WAIT;
+        //task->state = TOP_TASK_ST_LOCK_WAIT;
         TOP_TASK_SUSPEND(task);
     } else {
         mutex->locked = top_current_task();
@@ -71,7 +71,7 @@ void top_cond_signal(top_cond_t* cond)
     if(cond->waiting_count) {
         top_task_t* task = top_list_entry(top_list_remove_first(&cond->waiting),top_task_t,node);
         --cond->waiting_count;
-        task->state = TOP_TASK_ST_COND_WAIT;
+        //task->state = TOP_TASK_ST_COND_WAIT;
         TOP_TASK_RESUME(task);
     } else {
         cond->sig_count = 1;
@@ -96,7 +96,7 @@ void top_sem_wait(top_sem_t* sem)
     if(sem->value == 0) {
         ++sem->waiting_count;
         top_list_add_tail(&sem->waiting,&task->node);
-        task->state = TOP_TASK_ST_SEM_WAIT;
+        //task->state = TOP_TASK_ST_SEM_WAIT;
         TOP_TASK_SUSPEND(task);
     }
     --sem->value ;

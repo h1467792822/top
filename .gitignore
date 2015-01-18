@@ -10,4 +10,4 @@ build-aux
 Makefile.in
 *.cache
 *.m4
-configure
+!build/configure

@@ -27,6 +27,14 @@ extern "C" {
 
 #define top_atomic_set(pv,v) (*(pv) = (v))
 
+#define top_atomic_inc(pv) ((void)top_add_and_fetch(pv,1))
+
+#define top_atomic_dec(pv) ((void)top_sub_and_fetch(pv,1))
+
+#define top_atomic_add(pv,v) ((void)top_sub_and_fetch(pv,v))
+
+#define top_atomic_sub(pv,v) ((void)top_sub_and_fetch(pv,v))
+
 #ifdef __cplusplus
 }
 #endif

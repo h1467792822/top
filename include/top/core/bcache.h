@@ -19,26 +19,24 @@ extern "C" {
 #endif
 
 struct top_alloc;
-struct top_bcache_conf
-{
-	struct top_alloc *alloc;
-	unsigned long max_capacity;
-	unsigned long page_size;
-	unsigned short block_size;
+struct top_bcache_conf {
+    struct top_alloc *alloc;
+    unsigned long max_capacity;
+    unsigned long page_size;
+    unsigned short block_size;
 };
 
-struct top_bcache
-{
-	struct top_hlist full_cached;
-	struct top_hlist partial_cached;
-	unsigned int full_cached_count;
-	unsigned int partial_cached_count;
-	unsigned int pages_count;
-	unsigned short block_size;
-	struct top_hlist pages;
-	unsigned long capacity;
-	unsigned long block_count_per_page;
-	struct top_bcache_conf conf;
+struct top_bcache {
+    struct top_hlist full_cached;
+    struct top_hlist partial_cached;
+    unsigned int full_cached_count;
+    unsigned int partial_cached_count;
+    unsigned int pages_count;
+    unsigned short block_size;
+    struct top_hlist pages;
+    unsigned long capacity;
+    unsigned long block_count_per_page;
+    struct top_bcache_conf conf;
 };
 
 void top_bcache_init(struct top_bcache* cache,const struct top_bcache_conf* conf);

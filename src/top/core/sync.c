@@ -22,9 +22,9 @@ void top_mutex_lock(top_mutex_t* mutex)
 {
     top_task_t* task = top_current_task();
     if(mutex->locked) {
+		task->flags |= TOP_TASK_FL_LOCK_WAIT;
         top_list_add_tail(&mutex->waiting,&task->node);
         ++mutex->waiting_count;
-        //task->state = TOP_TASK_ST_LOCK_WAIT;
         TOP_TASK_SUSPEND(task);
     } else {
         mutex->locked = top_current_task();
@@ -33,10 +33,12 @@ void top_mutex_lock(top_mutex_t* mutex)
 
 void top_mutex_unlock(top_mutex_t* mutex)
 {
-    assert(mutex->locked == top_current_task());
+	top_task_t* task = mutex->locked;
+    assert(task == top_current_task());
     if(mutex->waiting_count) {
         --mutex->waiting_count;
         mutex->locked = top_list_entry(top_list_remove_first(&mutex->waiting),top_task_t,node);
+		mutex->locked->flags &= ~TOP_TASK_FL_LOCK_WAIT;
         TOP_TASK_RESUME(mutex->locked);
     } else {
         mutex->locked = 0;
@@ -59,6 +61,7 @@ void top_cond_wait(top_cond_t* cond)
 {
     top_task_t* task = top_current_task();
     if(cond->sig_count == 0) {
+		task->flags |= TOP_TASK_FL_COND_WAIT;
         ++cond->waiting_count;
         top_list_add_tail(&cond->waiting,&task->node);
         TOP_TASK_SUSPEND(task);
@@ -70,8 +73,8 @@ void top_cond_signal(top_cond_t* cond)
 {
     if(cond->waiting_count) {
         top_task_t* task = top_list_entry(top_list_remove_first(&cond->waiting),top_task_t,node);
+		task->flags &= ~TOP_TASK_FL_COND_WAIT;
         --cond->waiting_count;
-        //task->state = TOP_TASK_ST_COND_WAIT;
         TOP_TASK_RESUME(task);
     } else {
         cond->sig_count = 1;
@@ -96,7 +99,7 @@ void top_sem_wait(top_sem_t* sem)
     if(sem->value == 0) {
         ++sem->waiting_count;
         top_list_add_tail(&sem->waiting,&task->node);
-        //task->state = TOP_TASK_ST_SEM_WAIT;
+		task->flags |= TOP_TASK_FL_SEM_WAIT;
         TOP_TASK_SUSPEND(task);
     }
     --sem->value ;
@@ -107,6 +110,7 @@ void top_sem_post(top_sem_t* sem)
     if(sem->waiting_count) {
         top_task_t* task;
         task = top_list_entry(top_list_remove_first(&sem->waiting),top_task_t,node);
+		task->flags &= ~TOP_TASK_FL_SEM_WAIT;
         --sem->waiting_count;
         TOP_TASK_RESUME(task);
     } else {

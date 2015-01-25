@@ -12,18 +12,18 @@ extern "C" {
 
 struct top_alloc;
 struct top_radix_tree_conf {
-	unsigned long max_capacity;
-	struct top_alloc* alloc;
+    unsigned long max_capacity;
+    struct top_alloc* alloc;
 };
 
 struct top_radix_tree_node;
 struct top_radix_tree {
-	int height;
-	unsigned long capacity;
-	struct top_radix_tree_node* root;
-	struct top_radix_tree_node* cached;
-	struct top_radix_tree_node* bulk_alloc;
-	struct top_radix_tree_conf conf;
+    int height;
+    unsigned long capacity;
+    struct top_radix_tree_node* root;
+    struct top_radix_tree_node* cached;
+    struct top_radix_tree_node* bulk_alloc;
+    struct top_radix_tree_conf conf;
 };
 
 

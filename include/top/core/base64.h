@@ -14,26 +14,26 @@ typedef unsigned char top_base64_decode_table[256];
 void top_base64_decode_table_init(top_base64_decode_table dtable,top_base64_encode_table etable);
 
 struct top_base64_ctx {
-	unsigned int in;
-	unsigned short waiting;
-	unsigned short tail;
-	pf_top_base64_output output;
-	void* user_data;
-	union {
-	const char* etable;
-	const unsigned char* dtable;
-	};
-	char padding;
+    unsigned int in;
+    unsigned short waiting;
+    unsigned short tail;
+    pf_top_base64_output output;
+    void* user_data;
+    union {
+        const char* etable;
+        const unsigned char* dtable;
+    };
+    char padding;
 };
 
 static inline unsigned int top_base64_encoded_size(unsigned int size)
 {
-	return ((size + 2) / 3) << 2;
+    return ((size + 2) / 3) << 2;
 }
 
 static inline unsigned int top_base64_decoded_size(unsigned int size)
 {
-	return ((size + 3) >> 2) * 3;
+    return ((size + 3) >> 2) * 3;
 }
 /**
 * etable,padding accept NULL

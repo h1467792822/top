@@ -97,12 +97,15 @@ static void* top_idle_main_loop(struct top_task_s* task, void* data)
     top_sched_t * sched = task->sched;
     struct timeval tm = { 0, 1000 };
     while(sched->task_count > 1 || 0 == (sched->flags & TOP_SCHED_FL_EXIT)) {
+		printf("\n sched: %p, task: %p\n",sched,task);
         sem_wait((sem_t*)sched->sem);
         (void)top_fetch_and_and(&sched->flags ,~TOP_SCHED_FL_ASYN);
         TOP_TASK_SUSPEND(task);
     }
-    top_longjmp(sched->main_context,1);
-    return 0;
+    //top_longjmp(sched->main_context,1);
+	sched->flags |= TOP_SCHED_FL_EXITED;
+	setcontext(&sched->main_context);
+	__builtin_unreachable();
 }
 
 #if 0
@@ -140,7 +143,9 @@ static void top_sched_main_loop(top_sched_t* sched)
     }
 #endif
     sem_post(psem);
-    if(0 == top_setjmp(sched->main_context)) {
+	getcontext(&sched->main_context);
+    //if(0 == top_setjmp(sched->main_context)) {
+	if(!(sched->flags & TOP_SCHED_FL_EXITED)) {
         top_schedule(sched);
     }
 
@@ -254,6 +259,7 @@ static void top_task_main(struct top_task_s* task)
     task->state = TOP_TASK_ST_RUNNING;
     ++sched->task_count;
     task->retval = task->main(task,task->main_data);
+	printf("\n retval: %p\n",task->retval);
     top_task_mark_rt_signal_exit(task);
     task->exit_sigmask = top_fetch_and_or(&task->sigmask,TOP_TASK_SIG_EXIT);
     printf("\n %p check sigmask: %dll\n",task,task->exit_sigmask);
@@ -279,8 +285,6 @@ static void top_task_main(struct top_task_s* task)
         }
     }
     --sched->task_count;
-    TOP_RESCHEDULE(sched);
-    __builtin_unreachable();
 }
 
 static inline void top_task_process_rt_signal(struct top_task_s* task, int signo, top_task_rt_sig_t* rt_sig)
@@ -363,7 +367,7 @@ static inline void top_sched_merge_asyn_running(struct top_sched_s* sched)
                     break;
                 default:
                     top_list_node_insert(&task->node,pos);
-                    pos = pos->prev;
+                    pos = &task->node;
                     break;
                 }
             } else {
@@ -378,6 +382,11 @@ void top_schedule(struct top_sched_s* sched)
 {
     uint64_t sigmask;
     top_task_t * task;
+	//top_list_add(&sched->running,&sched->idle.node);
+	//while(top_setjmp(sched->sched_context)) {
+		//printf("\n  ++++++++++ return to top_schedule\n");
+	//}
+	getcontext(&sched->sched_context);
 retry:
     top_sched_merge_asyn_running(sched);
     if(!top_list_empty(&sched->running)) {
@@ -385,12 +394,12 @@ retry:
         if(sched->imm_pos == &task->node) sched->imm_pos = (struct top_list_node*)&sched->running;
         task->priv_flags &= ~TOP_TASK_PRIV_FL_PENDING;
         task->flags &= ~TOP_TASK_FL_ASYN ;
-        printf("\ntop_schedule: %p\n",task);
     } else {
-        printf("\ntop_schedule: idle_task\n");
         task = &sched->idle;
+        printf("\ntop_schedule: idle_task: %p, sched: %p\n",task,&sched);
     }
     sched->current = task;
+    printf("\ntop_schedule: %p,state: %d,main_context:%p,sig_context: %p\n",task,task->state,&task->main_context,&task->sig_context);
     switch(task->state) {
     case TOP_TASK_ST_INIT:
         printf("\n init :%p\n",task);
@@ -398,36 +407,45 @@ retry:
             top_list_add(&sched->running,&task->node);
         }
         top_task_main(task);
+		printf("\n goto retry\n");
+		goto retry;
         break;
     case TOP_TASK_ST_RUNNING:
         sigmask = top_fetch_and_and(&task->sigmask,0);
         printf("\n top_schedule running,sigmask: %xull \n",sigmask);
         top_task_dispatch_signal(task,sigmask,TOP_TASK_ST_RUNNING);
         if(task->flags == 0 || task->flags == TOP_TASK_FL_EXIT) {
-            top_longjmp(task->main_context,1);
+			printf("\n top longjump: %p,%p\n",task,&task->main_context);
+            //top_longjmp(task->main_context,1);
+			setcontext(&task->main_context);
+			goto retry;
         } else {
+			printf("\n goto retry\n");
             goto retry;
         }
         break;
     case TOP_TASK_ST_SIGNAL:
-        printf("\n ST_SIGNAL\n");
-        top_longjmp(task->sig_context,1);
+        printf("\n +++ ST_SIGNAL: %p\n",task);
+		setcontext(&task->sig_context);
+        //top_longjmp(task->sig_context,1);
         break;
     case TOP_TASK_ST_WAIT_EXIT:
         printf("\n ST_WAIT_EXIT: %p\n",task);
         top_task_dispatch_signal(task,task->exit_sigmask,TOP_TASK_ST_EXIT);
-        top_longjmp(task->main_context,1);
+		setcontext(&task->main_context);
+        //top_longjmp(task->main_context,1);
         break;
     case TOP_TASK_ST_EXIT:
         printf("\n ST_EXIT: %p\n",task);
         task->priv_flags |= TOP_TASK_PRIV_FL_PENDING;
-        top_longjmp(task->main_context,1);
+        //top_longjmp(task->main_context,1);
+		setcontext(&task->main_context);
         break;
     default:
         assert(0);
         break;
     }
-
+	goto retry;
     printf("\n **** shouldn't reach here! *** \n");
     __builtin_unreachable();
 }

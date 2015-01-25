@@ -8,21 +8,19 @@
 extern "C" {
 #endif
 
-struct top_hlist_node
-{
-	struct top_hlist_node* next;
-	struct top_hlist_node** pprev;
+struct top_hlist_node {
+    struct top_hlist_node* next;
+    struct top_hlist_node** pprev;
 };
 
 
 /**
  * struct HashTable { struct top_hlist buckets[count]; }
- * 
+ *
  */
 
-struct top_hlist
-{
-	struct top_hlist_node* first;
+struct top_hlist {
+    struct top_hlist_node* first;
 };
 
 #define top_hlist_entry(ptr,type,member) top_container_of(ptr,type,member)
@@ -31,76 +29,76 @@ struct top_hlist
 
 #define TOP_HLIST(name) struct top_hlist name = TOP_HLIST_INIT()
 
-static inline void top_hlist_init(struct top_hlist* head) 
+static inline void top_hlist_init(struct top_hlist* head)
 {
-	head->first = 0;
+    head->first = 0;
 }
 
 static inline void top_hlist_node_init(struct top_hlist_node* node)
 {
-	node->next = 0;
-	node->pprev = 0;
+    node->next = 0;
+    node->pprev = 0;
 }
 
 static inline int top_hlist_empty(struct top_hlist* head)
 {
-	return 0 == head->first;
+    return 0 == head->first;
 }
 
 static inline void top_hlist_add_head(struct top_hlist* head,struct top_hlist_node* node)
 {
-	struct top_hlist_node* first = head->first;
-	node->next = first;
-	if(first) first->pprev = &node->next;
-	node->pprev = &head->first;
-	head->first = node;
+    struct top_hlist_node* first = head->first;
+    node->next = first;
+    if(first) first->pprev = &node->next;
+    node->pprev = &head->first;
+    head->first = node;
 }
 
 static inline void top_hlist_add_before(struct top_hlist_node* node,struct top_hlist_node* pos)
 {
-	node->pprev = pos->pprev;
-	*node->pprev = node;
-	node->next = pos;
-	pos->pprev = &node->next;
+    node->pprev = pos->pprev;
+    *node->pprev = node;
+    node->next = pos;
+    pos->pprev = &node->next;
 }
 
 static inline void top_hlist_add_after(struct top_hlist_node* node,struct top_hlist_node* pos)
 {
-	struct top_hlist_node* next = pos->next;
-	node->next = next;
-	node->pprev = &pos->next;
-	if(next) next->pprev = &node->next;
-	pos->next = node;
+    struct top_hlist_node* next = pos->next;
+    node->next = next;
+    node->pprev = &pos->next;
+    if(next) next->pprev = &node->next;
+    pos->next = node;
 }
 
 static inline void top_hlist_node_del(struct top_hlist_node* node)
 {
-	struct top_hlist_node* next = node->next;
-	*node->pprev = next;
-	if(next) next->pprev = node->pprev;
+    struct top_hlist_node* next = node->next;
+    *node->pprev = next;
+    if(next) next->pprev = node->pprev;
 }
 
 static inline void top_hlist_move(struct top_hlist* old,struct top_hlist* dest)
 {
-	dest->first = old->first;
-	if(dest->first) dest->first->pprev = &dest->first;
-	old->first = 0;
+    dest->first = old->first;
+    if(dest->first) dest->first->pprev = &dest->first;
+    old->first = 0;
 }
 
-static inline void top_hlist_node_move(struct top_hlist_node* node,struct top_hlist* dest) 
+static inline void top_hlist_node_move(struct top_hlist_node* node,struct top_hlist* dest)
 {
-	top_hlist_node_del(node);
-	top_hlist_add_head(dest,node);
+    top_hlist_node_del(node);
+    top_hlist_add_head(dest,node);
 }
 
 static inline struct top_hlist_node* top_hlist_remove_first(struct top_hlist* list)
 {
-	if(!top_hlist_empty(list)) {
-		struct top_hlist_node* node = list->first;
-		top_hlist_node_del(node);
-		return node;
-	}
-	return 0;
+    if(!top_hlist_empty(list)) {
+        struct top_hlist_node* node = list->first;
+        top_hlist_node_del(node);
+        return node;
+    }
+    return 0;
 }
 
 #define top_hlist_for_each(head,pos) \

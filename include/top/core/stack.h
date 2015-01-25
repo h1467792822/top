@@ -11,11 +11,11 @@ extern "C" {
 #endif
 
 struct top_stack_node {
-	struct top_stack_node* next;
+    struct top_stack_node* next;
 };
 
 struct top_stack {
-	struct top_stack_node* top;
+    struct top_stack_node* top;
 };
 
 #define top_stack_entry(ptr,type,member) \
@@ -26,30 +26,30 @@ struct top_stack {
 
 static inline void top_stack_init(struct top_stack* stack)
 {
-	stack->top = 0;
+    stack->top = 0;
 }
 
 static inline void top_stack_push(struct top_stack* stack,struct top_stack_node* node)
 {
-	node->next = stack->top;
-	stack->top = node;
+    node->next = stack->top;
+    stack->top = node;
 }
 
 static inline struct top_stack_node* top_stack_pop(struct top_stack* stack)
 {
-	struct top_stack_node* node = stack->top;
-	if(node) stack->top = node->next;
-	return node;
+    struct top_stack_node* node = stack->top;
+    if(node) stack->top = node->next;
+    return node;
 }
 
 static inline struct top_stack_node* top_stack_top(struct top_stack* stack)
 {
-	return stack->top;
+    return stack->top;
 }
 
 static inline int top_stack_empty(struct top_stack* stack)
 {
-	return 0 == stack->top;
+    return 0 == stack->top;
 }
 
 #ifdef __cplusplus

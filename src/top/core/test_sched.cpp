@@ -25,10 +25,10 @@ class TestSched: public CPPUNIT_NS::TestFixture
     CPPUNIT_TEST_SUITE(TestSched);
 #if 1
     CPPUNIT_TEST( testOneTask );
-    //CPPUNIT_TEST( testChildTask );
+    CPPUNIT_TEST( testChildTask );
     //CPPUNIT_TEST( testSignal );
-    //CPPUNIT_TEST( testLock );
-    //CPPUNIT_TEST( testCond );
+    CPPUNIT_TEST( testLock );
+    CPPUNIT_TEST( testCond );
 #else
     CPPUNIT_TEST( testLock );
 #endif
@@ -135,12 +135,12 @@ public:
 		top_mutex_t* lock = (top_mutex_t*)paras[0];
 		long* pd = (long*)paras[1];
 		for(;*pd < 100;){
-			//top_mutex_lock(lock);
+			top_mutex_lock(lock);
 			++*pd;
 			printf("\n lock_run: task: %p, %ld\n", task,*pd);
 			top_task_yield(task);
 
-			//top_mutex_unlock(lock);
+			top_mutex_unlock(lock);
 		}
 		printf("\n exit task: %p, %ld\n", task,*pd);
 		return 0;
@@ -153,8 +153,8 @@ public:
 		void* paras[] = { &lock,&d };
 		top_task_t task1,task2;
 		top_mutex_init(&lock);
-		top_task_init(&task1,0,lock_run_fake,paras);
-		top_task_init(&task2,0,lock_run_fake,paras);
+		top_task_init(&task1,0,lock_run,paras);
+		top_task_init(&task2,0,lock_run,paras);
 		printf("\n !!!!! taask : %p ,main_context:%p,sig_context: %p\n", &task1,&task1.main_context,&task1.sig_context);
 		printf("\n !!!!! taask : %p ,main_context:%p,sig_context: %p\n", &task2,&task2.main_context,&task2.sig_context);
 		top_task_active(&task2,&sched);

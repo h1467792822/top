@@ -253,8 +253,9 @@ static inline void top_task_mark_rt_signal_exit(struct top_task_s* task)
     }
 }
 
-static void top_task_main(struct top_task_s* task)
+static void top_task_main()
 {
+	top_task_t* task = g_current_sched->current;
     top_sched_t * sched = task->sched;
     task->state = TOP_TASK_ST_RUNNING;
     ++sched->task_count;
@@ -406,7 +407,12 @@ retry:
         if(task->sigmask) {
             top_list_add(&sched->running,&task->node);
         }
-        top_task_main(task);
+		getcontext(&task->main_context);
+		task->main_context.uc_stack.ss_sp = malloc(16 * 1024);
+		task->main_context.uc_stack.ss_size = 16 * 1024;
+		task->main_context.uc_link = &sched->sched_context;
+		makecontext(&task->main_context,top_task_main,0);
+        setcontext(&task->main_context);
 		printf("\n goto retry\n");
 		goto retry;
         break;

@@ -115,6 +115,7 @@ typedef struct top_task_s {
     void* volatile retval;
     struct top_task_s * join_task;
     struct top_join_cond_s* join_cond;
+	char sp[16 * 1024];
 } top_task_t;
 
 /**

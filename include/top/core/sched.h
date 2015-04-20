@@ -99,10 +99,7 @@ typedef struct top_task_s {
     struct top_stack_node asyn_node;
     struct top_list_node to_sched;
     top_task_stat_t stat;
-    //top_jmp_buf main_context;
-    //top_jmp_buf sig_context;
-	ucontext_t main_context;
-	ucontext_t sig_context;
+	ucontext_t ucontext;
     volatile unsigned int flags;
     volatile uint64_t sigmask;
     uint64_t exit_sigmask;

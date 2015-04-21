@@ -66,23 +66,46 @@ typedef struct top_co_task_s {
 	unsigned int sp_size;
 }top_co_task_t;
 
+struct top_co_task_proxy_s;
+typedef struct top_co_task_proxy_operation_s {
+	top_error_t (*resume*)(struct top_co_task_proxy_s* task);
+	top_error_t (*join)(struct top_co_task_proxy_s* task);
+	top_error_t (*kill)(struct top_co_task_proxy_s* task,int signo);
+	top_error_t (*rt_kill)(struct top_co_task_proxy_s* task,int signo,void* data);
+}top_co_task_proxy_operation_t;
+
+typedef struct top_co_task_proxy_s {
+	top_co_task_proxy_operation_t* op;
+	top_co_task_t * object;
+	top_co_task_t* caller;
+}top_co_task_proxy_t;
+
 /**
   * can be called anywhere
   */
 void top_co_task_init(struct top_co_task_s* task, top_co_task_conf_t* conf);
 top_error_t top_co_task_active(struct top_co_task_s* task,struct top_co_sched_s* sch);
-top_error_t top_co_task_resume_r(struct top_co_task_s* task);
-top_error_t top_co_task_join_r(struct top_co_task_s* task);
+top_error_t top_co_task_proxy_resume(struct top_co_task_proxy_s* task);
+top_error_t top_co_task_proxy_join(struct top_co_task_proxy_s* task);
+top_error_t top_co_task_proxy_kill(struct top_co_task_proxy_s* task,int signo);
+top_error_t top_co_task_proxy_rt_kill(struct top_co_task_proxy_s* task,int signo,void* data);
 
 
 /**
   * only called in task
   */
 top_error_t top_co_task_restart(struct top_co_task_s* task,struct top_sched_s* sch);
-void top_task_suspend(struct top_co_task_s* task);
-void top_task_yield(struct top_co_task_s* task);
-void top_task_sleep(struct top_co_task_s* task,unsigned long secs);
-void top_task_usleep(struct top_co_task_s* task,unsigned long usecs);
+void top_co_task_suspend(struct top_co_task_s* task);
+void top_co_task_resume(struct top_co_task_s* task);
+void top_co_task_yield(struct top_co_task_s* task);
+void top_co_task_sleep(struct top_co_task_s* task,unsigned long secs);
+void top_co_task_usleep(struct top_co_task_s* task,unsigned long usecs);
+top_error_t top_co_task_kill(struct top_co_task_s* task,int signo);
+top_error_t top_co_task_rt_kill(struct top_co_task_s* task,int signo,void* data);
+
+typedef void (*pf_top_co_task_sig_handler)(struct top_co_task_s* task,int signo,void* data);
+
+top_error_t top_co_task_sigaction(struct top_co_task_s* task,int signo,pf_top_co_task_sig_handler sig_handler);
 
 typedef struct top_sched_stat_s {
     unsigned long sched_times;

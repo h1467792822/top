@@ -11,7 +11,7 @@
 extern "C" {
 #endif
 
-#define tb_list_entry(ptr,type,member) tb_container_of(ptr,type,member)
+#define tb_list_entry(ptr,type,member) container_of(ptr,type,member)
 
 typedef struct tb_list_node {
     struct tb_list_node* next;

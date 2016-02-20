@@ -6,8 +6,8 @@
 extern "C" {
 #endif
 
-#define tb_offset_of(type,member) ((unsigned long)(&((type*)0)->member))
-#define tb_container_of(ptr,type,member) ((type*)((const char*)(ptr) - tb_offset_of(type,member)))
+#define offset_of(type,member) ((unsigned long)(&((type*)0)->member))
+#define container_of(ptr,type,member) ((type*)((const char*)(ptr) - offset_of(type,member)))
 
 #ifdef __cplusplus
 }

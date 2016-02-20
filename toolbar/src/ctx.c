@@ -8,58 +8,58 @@
 #define CTX_ALLOC_COUNT (40 * 1024)
 
 
-static struct ctx** cached_ctx = 0;
-static struct ctx* ctx_block_beg = 0;
-static struct ctx* ctx_block_end = 0;
+static struct proxy_ctx** cached_proxy_ctx = 0;
+static struct proxy_ctx* proxy_ctx_block_beg = 0;
+static struct proxy_ctx* proxy_ctx_block_end = 0;
 
 
-static inline struct ctx* new_ctx_from_block()
+static inline struct proxy_ctx* new_proxy_ctx_from_block()
 {
-	struct ctx* ctx;
-	if(ctx_block_beg == ctx_block_end) {
-		ctx_block_beg = tb_malloc(sizeof(struct ctx) * CTX_ALLOC_COUNT);
-		if (!ctx_block_beg) {
-			ctx_block_end = 0;
+	struct proxy_ctx* proxy_ctx = 0;
+	if(proxy_ctx_block_beg == proxy_ctx_block_end) {
+		proxy_ctx_block_beg = tb_malloc(sizeof(struct proxy_ctx) * CTX_ALLOC_COUNT);
+		if (!proxy_ctx_block_beg) {
+			proxy_ctx_block_end = 0;
 			goto out;
 		}
-		memset(ctx,0,sizeof(struct ctx) * CTX_ALLOC_COUNT);
-		ctx_block_end = ctx + CTX_ALLOC_COUNT;
+		memset(proxy_ctx_block_beg,0,sizeof(struct proxy_ctx) * CTX_ALLOC_COUNT);
+		proxy_ctx_block_end = proxy_ctx_block_beg + CTX_ALLOC_COUNT;
 	}
-	ctx = ctx_block_beg++;
+	proxy_ctx = proxy_ctx_block_beg++;
 out:
-	return ctx;
+	return proxy_ctx;
 }
 
 
-static inline struct ctx* new_ctx_from_cached()
+static inline struct proxy_ctx* new_proxy_ctx_from_cached()
 {
-	struct ctx* ctx;
-	assert(cached_ctx);
-	ctx = (struct ctx*)cached_ctx;
-	cached_ctx = (struct ctx**)*cached_ctx;
-	*(struct ctx**)ctx = 0;
-	return ctx;
+	struct proxy_ctx* proxy_ctx;
+	assert(cached_proxy_ctx);
+	proxy_ctx = (struct proxy_ctx*)cached_proxy_ctx;
+	cached_proxy_ctx = (struct proxy_ctx**)*cached_proxy_ctx;
+	*(struct proxy_ctx**)proxy_ctx = 0;
+	return proxy_ctx;
 }
 
 
-static inline void free_ctx(struct ctx* ctx)
+static inline void free_proxy_ctx(struct proxy_ctx* proxy_ctx)
 {
-	memset(ctx,0,sizeof(*ctx));
-	*(struct ctx**)ctx = (struct ctx*)cached_ctx;
-	cached_ctx = (struct ctx**)ctx;
+	memset(proxy_ctx,0,sizeof(*proxy_ctx));
+	*(struct proxy_ctx**)proxy_ctx = (struct proxy_ctx*)cached_proxy_ctx;
+	cached_proxy_ctx = (struct proxy_ctx**)proxy_ctx;
 }
 
-struct ctx* ctx_alloc()
+struct proxy_ctx* proxy_ctx_alloc()
 {
-	if(cached_ctx)
-		return new_ctx_from_cached();
+	if(cached_proxy_ctx)
+		return new_proxy_ctx_from_cached();
 	else
-		return new_ctx_from_block();
+		return new_proxy_ctx_from_block();
 }
 
-void ctx_free(struct ctx* ctx)
+void proxy_ctx_free(struct proxy_ctx* proxy_ctx)
 {
-	assert(ctx);
-	free_ctx(ctx);
+	assert(proxy_ctx);
+	free_proxy_ctx(proxy_ctx);
 }
  

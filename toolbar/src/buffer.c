@@ -1,6 +1,7 @@
 
 #include "buffer.h"
 #include <sys/uio.h>
+#include <assert.h>
 #include "mem.h"
 
 
@@ -34,6 +35,7 @@ static inline void* new_buff_from_cached()
 {
 	void* buf = cached_buff;
 	cached_buff = (void**)*cached_buff;	
+	return buf;
 }
 
 
@@ -62,7 +64,7 @@ static inline void free_buff(void* buf)
 {
 	assert(buf);
 	void** pbuf = (void**)buf;
-	*pbuf = cached_buff;
+	*pbuf = (void*)cached_buff;
 	cached_buff = pbuf;
 }
 
@@ -70,7 +72,7 @@ void buff_vec_free(struct iovec* vec,int n)
 {
 	int i = 0;
 	for(; i < n; ++i) {
-		free_buff(vec[i].iov_base);
+		free_buff((void*)(((size_t)vec[i].iov_base) & ~(BUF_LEN - 1)));
 	}
 }
 

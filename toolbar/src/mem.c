@@ -3,15 +3,6 @@
 #include <stdlib.h>
 #include <assert.h>
 
-
-struct mem {
-	void* (*malloc)(size_t size);
-	void (*free)(void* p);
-	void* (*realloc)(void* p, size_t size);
-	void* (*calloc)(size_t nmemb,size_t size);
-};
-
-
 static struct mem g_mem = {
 	malloc, free, realloc,calloc
 };
@@ -41,9 +32,4 @@ void* calloc(size_t nmemb,size_t size){
 	return g_mem.calloc(nmemb,size);
 }
 
-#ifdef __cplusplus
-}
-#endif
-
-#endif
 

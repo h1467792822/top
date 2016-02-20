@@ -10,4 +10,8 @@ build-aux
 Makefile.in
 *.cache
 *.m4
+.deps
+stamp-h1
+config.log
+config.status
 !build/configure

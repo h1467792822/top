@@ -1,14 +1,14 @@
 
 #line 1 "parse_rsp.rl"
 
-#include "parse_req.h"
+#include "parse.h"
 #include <stdio.h>
 
 
 #line 9 "parse_rsp.c"
 static const char _req_machine_actions[] = {
 	0, 1, 0, 1, 1, 1, 2, 1, 
-	3, 1, 4
+	3, 1, 4, 2, 0, 1
 };
 
 static const unsigned char _req_machine_key_offsets[] = {
@@ -142,7 +142,7 @@ static const char _req_machine_trans_targs[] = {
 
 static const char _req_machine_trans_actions[] = {
 	7, 0, 0, 0, 0, 0, 0, 0, 
-	0, 0, 0, 0, 0, 0, 0, 0, 
+	0, 0, 0, 0, 3, 0, 0, 0, 
 	0, 0, 0, 0, 0, 0, 9, 0, 
 	0, 0, 0, 0, 0, 0, 0, 0, 
 	0, 0, 0, 0, 0, 0, 0, 0, 
@@ -150,7 +150,7 @@ static const char _req_machine_trans_actions[] = {
 	5, 0, 0, 0, 0, 0, 0, 0, 
 	0, 0, 0, 0, 0, 1, 0, 0, 
 	0, 0, 0, 0, 0, 0, 0, 0, 
-	1, 0
+	11, 0
 };
 
 static const char _req_machine_eof_actions[] = {
@@ -269,13 +269,13 @@ _match:
 	case 0:
 #line 12 "parse_rsp.rl"
 	{
-	data->flag = 1;
+	data->true_flag = 1;
 }
 	break;
 	case 1:
 #line 16 "parse_rsp.rl"
 	{
-	data->flag = 0;
+	data->false_flag = 1;
 }
 	break;
 	case 2:

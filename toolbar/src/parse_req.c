@@ -1,7 +1,7 @@
 
 #line 1 "parse_req.rl"
 
-#include "parse_req.h"
+#include "parse.h"
 #include <stdio.h>
 
 
@@ -238,13 +238,13 @@ _match:
 	case 0:
 #line 12 "parse_req.rl"
 	{
-	data->flag = 1;
+	data->true_flag = 1;
 }
 	break;
 	case 1:
 #line 16 "parse_req.rl"
 	{
-	data->flag = 0;
+	data->false_flag = 1;
 }
 	break;
 	case 2:

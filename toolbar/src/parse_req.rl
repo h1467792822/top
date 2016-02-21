@@ -1,5 +1,5 @@
 
-#include "parse_req.h"
+#include "parse.h"
 #include <stdio.h>
 
 %%{
@@ -10,11 +10,11 @@ variable p (data->p);
 variable pe (data->pe);
 
 action true_cond {
-	data->flag = 1;
+	data->true_flag = 1;
 }
 
 action false_cond {
-	data->flag = 0;
+	data->false_flag = 1;
 }
 
 action length {

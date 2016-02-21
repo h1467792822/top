@@ -1,7 +1,7 @@
 
 #include <cppunit/extensions/HelperMacros.h>
 #include <string.h>
-#include "parse_req.h"
+#include "parse.h"
 #include <stdio.h>
 
 using namespace std;
@@ -34,9 +34,9 @@ public:
 		data.p = req;data.pe = req + strlen(req) + 1;
 		parse_req_beg(&data);
 		parse_req(&data);
-		printf("\ndata: flag=%d,length=%d,p=%s\n",data.flag,data.length,data.p);
+		printf("\ndata: flag=%d,length=%d,p=%s\n",data.true_flag,data.length,data.p);
 		CPPUNIT_ASSERT(data.length == 10);
-		CPPUNIT_ASSERT(data.flag);
+		CPPUNIT_ASSERT(data.true_flag);
 		CPPUNIT_ASSERT(data.err == 0);
 		CPPUNIT_ASSERT('0' == *data.p);
 	}
@@ -54,9 +54,9 @@ public:
 		data.p = req;data.pe = req + strlen(req) + 1;
 		parse_req_beg(&data);
 		parse_req(&data);
-		printf("\ndata: flag=%d,length=%d,p=%s\n",data.flag,data.length,data.p);
+		printf("\ndata: flag=%d,length=%d,p=%s\n",data.true_flag,data.length,data.p);
 		CPPUNIT_ASSERT(data.length == 10);
-		CPPUNIT_ASSERT(data.flag == 0);
+		CPPUNIT_ASSERT(data.false_flag);
 		CPPUNIT_ASSERT(data.err == 0);
 		CPPUNIT_ASSERT('0' == *data.p);
 	}
@@ -74,9 +74,9 @@ public:
 		data.p = req;data.pe = req + strlen(req) + 1;
 		parse_req_beg(&data);
 		parse_req(&data);
-		printf("\ndata: flag=%d,length=%d,p=%s\n",data.flag,data.length,data.p);
+		printf("\ndata: flag=%d,length=%d,p=%s\n",data.true_flag,data.length,data.p);
 		CPPUNIT_ASSERT(data.length == 10);
-		CPPUNIT_ASSERT(data.flag == 0);
+		CPPUNIT_ASSERT(data.false_flag);
 		CPPUNIT_ASSERT(data.err == 0);
 		CPPUNIT_ASSERT('0' == *data.p);
 	}
@@ -99,9 +99,9 @@ public:
 		parse_req(&data);
 		data.p = req2;data.pe = req2 + strlen(req2) + 1;
 		parse_req(&data);
-		printf("\ndata: flag=%d,length=%d,p=%s\n",data.flag,data.length,data.p);
+		printf("\ndata: flag=%d,length=%d,p=%s\n",data.true_flag,data.length,data.p);
 		CPPUNIT_ASSERT(data.length == 9);
-		CPPUNIT_ASSERT(data.flag);
+		CPPUNIT_ASSERT(data.true_flag);
 		CPPUNIT_ASSERT(data.err == 0);
 		CPPUNIT_ASSERT('1' == *data.p);
 	}

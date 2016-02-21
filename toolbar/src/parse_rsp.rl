@@ -1,5 +1,5 @@
 
-#include "parse_req.h"
+#include "parse.h"
 #include <stdio.h>
 
 %%{
@@ -10,11 +10,11 @@ variable p (data->p);
 variable pe (data->pe);
 
 action true_cond {
-	data->flag = 1;
+	data->true_flag = 1;
 }
 
 action false_cond {
-	data->flag = 0;
+	data->false_flag = 1;
 }
 
 action length {
@@ -35,7 +35,7 @@ TransferEncoding = "Transfer-Encoding" ' ' * ":" ' ' * (^[\r\n])+;
 
 CRLF = "\r\n";
 VER = "HTTP/" ( "0.9" | "1.0" | "1.1" ) ' '*;
-CODE = ("200 " @true_cond | digit+ " ") (^[\r\n])+;
+CODE = ("200 " @true_cond | (digit+ " ") @false_cond) (^[\r\n])+;
 rsqline = VER CODE CRLF;
 headline = (ContentLength | ContentEncoding @false_cond | TransferEncoding @false_cond | HtmlType @true_cond | ((^[\r\n])+) ) CRLF;
 headend = CRLF @{fbreak;};

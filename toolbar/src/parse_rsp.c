@@ -8,7 +8,7 @@
 #line 9 "parse_rsp.c"
 static const char _req_machine_actions[] = {
 	0, 1, 0, 1, 1, 1, 2, 1, 
-	3, 1, 4, 2, 0, 1
+	3, 1, 4
 };
 
 static const unsigned char _req_machine_key_offsets[] = {
@@ -150,7 +150,7 @@ static const char _req_machine_trans_actions[] = {
 	5, 0, 0, 0, 0, 0, 0, 0, 
 	0, 0, 0, 0, 0, 1, 0, 0, 
 	0, 0, 0, 0, 0, 0, 0, 0, 
-	11, 0
+	1, 0
 };
 
 static const char _req_machine_eof_actions[] = {
@@ -173,22 +173,22 @@ static const int req_machine_error = 0;
 static const int req_machine_en_main = 1;
 
 
-#line 44 "parse_rsp.rl"
+#line 48 "parse_rsp.rl"
 
 
-void parse_rsq_beg(struct parse_data* data)
+void parse_rsp_beg(struct parse_data* data)
 {
 	
 #line 183 "parse_rsp.c"
 	{
-	( (data->cs)) = req_machine_start;
+	 data->cs = req_machine_start;
 	}
 
-#line 50 "parse_rsp.rl"
+#line 54 "parse_rsp.rl"
 
 }
 
-void parse_rsq(struct parse_data* data)
+void parse_rsp(struct parse_data* data)
 {
 	const char* eof = 0;
 	
@@ -200,15 +200,13 @@ void parse_rsq(struct parse_data* data)
 	unsigned int _nacts;
 	const char *_keys;
 
-	if ( ( (data->p)) == ( (data->pe)) )
-		goto _test_eof;
-	if ( ( (data->cs)) == 0 )
+	if (  data->cs == 0 )
 		goto _out;
 _resume:
-	_keys = _req_machine_trans_keys + _req_machine_key_offsets[( (data->cs))];
-	_trans = _req_machine_index_offsets[( (data->cs))];
+	_keys = _req_machine_trans_keys + _req_machine_key_offsets[ data->cs];
+	_trans = _req_machine_index_offsets[ data->cs];
 
-	_klen = _req_machine_single_lengths[( (data->cs))];
+	_klen = _req_machine_single_lengths[ data->cs];
 	if ( _klen > 0 ) {
 		const char *_lower = _keys;
 		const char *_mid;
@@ -231,7 +229,7 @@ _resume:
 		_trans += _klen;
 	}
 
-	_klen = _req_machine_range_lengths[( (data->cs))];
+	_klen = _req_machine_range_lengths[ data->cs];
 	if ( _klen > 0 ) {
 		const char *_lower = _keys;
 		const char *_mid;
@@ -255,7 +253,7 @@ _resume:
 
 _match:
 	_trans = _req_machine_indicies[_trans];
-	( (data->cs)) = _req_machine_trans_targs[_trans];
+	 data->cs = _req_machine_trans_targs[_trans];
 
 	if ( _req_machine_trans_actions[_trans] == 0 )
 		goto _again;
@@ -270,54 +268,57 @@ _match:
 #line 12 "parse_rsp.rl"
 	{
 	data->true_flag = 1;
+	parse_data_dump(data,"true_cond");
 }
 	break;
 	case 1:
-#line 16 "parse_rsp.rl"
+#line 17 "parse_rsp.rl"
 	{
 	data->false_flag = 1;
+	parse_data_dump(data,"false_cond");
 }
 	break;
 	case 2:
-#line 20 "parse_rsp.rl"
+#line 22 "parse_rsp.rl"
 	{
 	data->length *= 10;
 	data->length += *data->p - '0';	
 }
 	break;
 	case 3:
-#line 25 "parse_rsp.rl"
+#line 27 "parse_rsp.rl"
 	{
 	data->err = 1;
+	parse_data_dump(data,"on_err");
 }
 	break;
 	case 4:
-#line 41 "parse_rsp.rl"
+#line 45 "parse_rsp.rl"
 	{{( (data->p))++; goto _out; }}
 	break;
-#line 299 "parse_rsp.c"
+#line 300 "parse_rsp.c"
 		}
 	}
 
 _again:
-	if ( ( (data->cs)) == 0 )
+	if (  data->cs == 0 )
 		goto _out;
-	if ( ++( (data->p)) != ( (data->pe)) )
-		goto _resume;
-	_test_eof: {}
+	( (data->p)) += 1;
+	goto _resume;
 	if ( ( (data->p)) == eof )
 	{
-	const char *__acts = _req_machine_actions + _req_machine_eof_actions[( (data->cs))];
+	const char *__acts = _req_machine_actions + _req_machine_eof_actions[ data->cs];
 	unsigned int __nacts = (unsigned int) *__acts++;
 	while ( __nacts-- > 0 ) {
 		switch ( *__acts++ ) {
 	case 3:
-#line 25 "parse_rsp.rl"
+#line 27 "parse_rsp.rl"
 	{
 	data->err = 1;
+	parse_data_dump(data,"on_err");
 }
 	break;
-#line 321 "parse_rsp.c"
+#line 322 "parse_rsp.c"
 		}
 	}
 	}
@@ -325,7 +326,7 @@ _again:
 	_out: {}
 	}
 
-#line 59 "parse_rsp.rl"
+#line 63 "parse_rsp.rl"
 
 }
 

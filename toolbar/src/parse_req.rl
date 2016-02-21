@@ -5,9 +5,9 @@
 %%{
 machine req_machine;
 
-variable cs (data->cs);
 variable p (data->p);
 variable pe (data->pe);
+access data->;
 
 action true_cond {
 	data->true_flag = 1;

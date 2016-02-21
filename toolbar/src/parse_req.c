@@ -150,7 +150,7 @@ void parse_req_beg(struct parse_data* data)
 	
 #line 152 "parse_req.c"
 	{
-	( (data->cs)) = req_machine_start;
+	 data->cs = req_machine_start;
 	}
 
 #line 50 "parse_req.rl"
@@ -171,13 +171,13 @@ void parse_req(struct parse_data* data)
 
 	if ( ( (data->p)) == ( (data->pe)) )
 		goto _test_eof;
-	if ( ( (data->cs)) == 0 )
+	if (  data->cs == 0 )
 		goto _out;
 _resume:
-	_keys = _req_machine_trans_keys + _req_machine_key_offsets[( (data->cs))];
-	_trans = _req_machine_index_offsets[( (data->cs))];
+	_keys = _req_machine_trans_keys + _req_machine_key_offsets[ data->cs];
+	_trans = _req_machine_index_offsets[ data->cs];
 
-	_klen = _req_machine_single_lengths[( (data->cs))];
+	_klen = _req_machine_single_lengths[ data->cs];
 	if ( _klen > 0 ) {
 		const char *_lower = _keys;
 		const char *_mid;
@@ -200,7 +200,7 @@ _resume:
 		_trans += _klen;
 	}
 
-	_klen = _req_machine_range_lengths[( (data->cs))];
+	_klen = _req_machine_range_lengths[ data->cs];
 	if ( _klen > 0 ) {
 		const char *_lower = _keys;
 		const char *_mid;
@@ -224,7 +224,7 @@ _resume:
 
 _match:
 	_trans = _req_machine_indicies[_trans];
-	( (data->cs)) = _req_machine_trans_targs[_trans];
+	 data->cs = _req_machine_trans_targs[_trans];
 
 	if ( _req_machine_trans_actions[_trans] == 0 )
 		goto _again;
@@ -269,14 +269,14 @@ _match:
 	}
 
 _again:
-	if ( ( (data->cs)) == 0 )
+	if (  data->cs == 0 )
 		goto _out;
 	if ( ++( (data->p)) != ( (data->pe)) )
 		goto _resume;
 	_test_eof: {}
 	if ( ( (data->p)) == eof )
 	{
-	const char *__acts = _req_machine_actions + _req_machine_eof_actions[( (data->cs))];
+	const char *__acts = _req_machine_actions + _req_machine_eof_actions[ data->cs];
 	unsigned int __nacts = (unsigned int) *__acts++;
 	while ( __nacts-- > 0 ) {
 		switch ( *__acts++ ) {

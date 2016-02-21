@@ -80,16 +80,18 @@ ARFLAGS = cru
 libtoolbar_a_AR = $(AR) $(ARFLAGS)
 libtoolbar_a_LIBADD =
 am__objects_1 = mem.$(OBJEXT) ctx.$(OBJEXT) buffer.$(OBJEXT) \
-	state.$(OBJEXT)
+	state.$(OBJEXT) parse_req.$(OBJEXT)
 am_libtoolbar_a_OBJECTS = $(am__objects_1)
 libtoolbar_a_OBJECTS = $(am_libtoolbar_a_OBJECTS)
 PROGRAMS = $(bin_PROGRAMS)
 am__test_toolbar_SOURCES_DIST = test_main.cpp test_buffer.cpp \
-	test_state.cpp test_ctx.cpp mem.c ctx.c buffer.c state.c
+	test_state.cpp test_parse_req.cpp test_ctx.cpp mem.c ctx.c \
+	buffer.c state.c parse_req.c
 am_test_toolbar_OBJECTS =  \
 	test_toolbar-test_main.$(OBJEXT) \
 	test_toolbar-test_buffer.$(OBJEXT) \
 	test_toolbar-test_state.$(OBJEXT) \
+	test_toolbar-test_parse_req.$(OBJEXT) \
 	test_toolbar-test_ctx.$(OBJEXT) \
 	$(am__objects_1)
 test_toolbar_OBJECTS = $(am_test_toolbar_OBJECTS)
@@ -210,13 +212,14 @@ top_build_prefix = ../
 top_builddir = ..
 top_srcdir = ..
 lib_LIBRARIES = libtoolbar.a
-SOURCES = mem.c ctx.c buffer.c state.c
+SOURCES = mem.c ctx.c buffer.c state.c parse_req.c
 libtoolbar_a_SOURCES = $(SOURCES)
 toolbar_SOURCES = main.c 
 toolbar_LDADD = libtoolbar.a
 test_toolbar_SOURCES = test_main.cpp \
 					   test_buffer.cpp \
 					   test_state.cpp \
+					   test_parse_req.cpp \
 					   test_ctx.cpp $(SOURCES)
 
 test_toolbar_LDFLAGS = -L/usr/local/lib -lcppunit -ldl   
@@ -346,10 +349,12 @@ include ./$(DEPDIR)/buffer.Po
 include ./$(DEPDIR)/ctx.Po
 include ./$(DEPDIR)/main.Po
 include ./$(DEPDIR)/mem.Po
+include ./$(DEPDIR)/parse_req.Po
 include ./$(DEPDIR)/state.Po
 include ./$(DEPDIR)/test_toolbar-test_buffer.Po
 include ./$(DEPDIR)/test_toolbar-test_ctx.Po
 include ./$(DEPDIR)/test_toolbar-test_main.Po
+include ./$(DEPDIR)/test_toolbar-test_parse_req.Po
 include ./$(DEPDIR)/test_toolbar-test_state.Po
 
 .c.o:
@@ -421,6 +426,20 @@ test_toolbar-test_state.obj: test_state.cpp
 #	source='test_state.cpp' object='test_toolbar-test_state.obj' libtool=no \
 #	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) \
 #	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(test_toolbar_CXXFLAGS) $(CXXFLAGS) -c -o test_toolbar-test_state.obj `if test -f 'test_state.cpp'; then $(CYGPATH_W) 'test_state.cpp'; else $(CYGPATH_W) '$(srcdir)/test_state.cpp'; fi`
+
+test_toolbar-test_parse_req.o: test_parse_req.cpp
+	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(test_toolbar_CXXFLAGS) $(CXXFLAGS) -MT test_toolbar-test_parse_req.o -MD -MP -MF $(DEPDIR)/test_toolbar-test_parse_req.Tpo -c -o test_toolbar-test_parse_req.o `test -f 'test_parse_req.cpp' || echo '$(srcdir)/'`test_parse_req.cpp
+	$(am__mv) $(DEPDIR)/test_toolbar-test_parse_req.Tpo $(DEPDIR)/test_toolbar-test_parse_req.Po
+#	source='test_parse_req.cpp' object='test_toolbar-test_parse_req.o' libtool=no \
+#	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) \
+#	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(test_toolbar_CXXFLAGS) $(CXXFLAGS) -c -o test_toolbar-test_parse_req.o `test -f 'test_parse_req.cpp' || echo '$(srcdir)/'`test_parse_req.cpp
+
+test_toolbar-test_parse_req.obj: test_parse_req.cpp
+	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(test_toolbar_CXXFLAGS) $(CXXFLAGS) -MT test_toolbar-test_parse_req.obj -MD -MP -MF $(DEPDIR)/test_toolbar-test_parse_req.Tpo -c -o test_toolbar-test_parse_req.obj `if test -f 'test_parse_req.cpp'; then $(CYGPATH_W) 'test_parse_req.cpp'; else $(CYGPATH_W) '$(srcdir)/test_parse_req.cpp'; fi`
+	$(am__mv) $(DEPDIR)/test_toolbar-test_parse_req.Tpo $(DEPDIR)/test_toolbar-test_parse_req.Po
+#	source='test_parse_req.cpp' object='test_toolbar-test_parse_req.obj' libtool=no \
+#	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) \
+#	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(test_toolbar_CXXFLAGS) $(CXXFLAGS) -c -o test_toolbar-test_parse_req.obj `if test -f 'test_parse_req.cpp'; then $(CYGPATH_W) 'test_parse_req.cpp'; else $(CYGPATH_W) '$(srcdir)/test_parse_req.cpp'; fi`
 
 test_toolbar-test_ctx.o: test_ctx.cpp
 	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(test_toolbar_CXXFLAGS) $(CXXFLAGS) -MT test_toolbar-test_ctx.o -MD -MP -MF $(DEPDIR)/test_toolbar-test_ctx.Tpo -c -o test_toolbar-test_ctx.o `test -f 'test_ctx.cpp' || echo '$(srcdir)/'`test_ctx.cpp

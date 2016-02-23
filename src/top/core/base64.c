@@ -41,7 +41,7 @@ void top_base64_decode_table_init(top_base64_decode_table dtable,top_base64_enco
     for(i = 0; i < 256; ++i) {
         dtable[i] = 255;
     }
-    printf("\nset dtable: etable: %s\n",etable);
+    //printf("\nset dtable: etable: %s\n",etable);
     for(i = 0; i < 64; ++i) {
         dtable[(unsigned char)etable[i]] = i;
     }

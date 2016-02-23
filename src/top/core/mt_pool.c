@@ -9,9 +9,9 @@
 
 struct top_pool_page {
     struct top_list_node node;
-    unsigned int avail_size;
-    unsigned int alloc_count: 28;
-    unsigned int fail_count: 4;
+    unsigned short avail_size;
+    unsigned short alloc_count;
+    unsigned char fail_count;
 };
 
 
